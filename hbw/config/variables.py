@@ -94,6 +94,64 @@ def add_feature_variables(config: od.Config) -> None:
         binning=(40, 0, 5),
         x_title=r"$\Delta R(j_{1},j_{2})$",
     )
+    config.add_variable(
+        name="m_ll",
+        binning=(40, 10., 80.),
+        x_title=r"$m_{ll}$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="m_lljjMET",
+        binning=(40, 0, 600),
+        x_title=r"$m_{lljj \not{E_T}}}$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="channel_id",
+        binning=(5, -0.5, 5),
+        x_title="Channel Id",
+        discrete_x=True,
+    )
+    config.add_variable(
+        name="ll_pt",
+        binning=(40, 0., 300),
+        x_title=r"$dilepton \,\, system \,\, p_T$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="bb_pt",
+        binning=(40, 0., 350),
+        x_title=r"$dijet\,\,system \,\,p_T$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="deltaR_ll",
+        binning=(40, 0., 4),
+        x_title=r"\Delta R (l,l)",
+    )
+    config.add_variable(
+        name="E_miss",
+        binning=(40, 0., 400),
+        x_title="MET",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="MT",
+        binning=(40, 0., 400),
+        x_title=r"$ \not{E_T}$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="min_dr_ljj",
+        binning=(40, 0, 4),
+        x_title=r"$\textrm{min} \Delta R(l,j)$",
+    )
+    config.add_variable(
+        name="delta_Phi",
+        binning=(40, 0, 3),
+        x_title=r"$ \Delta \phi(ll,jj)$",
+    )
+    
     # FatJet features
     for i in range(2):
         config.add_variable(

@@ -63,20 +63,70 @@ def bb_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
 
     return events
 
+@producer(
+    uses={ 
+        "Lepton.pt", "Lepton.eta", "Lepton.phi", "Lepton.mass",
+        "Bjet.pt", "Bjet.eta", "Bjet.phi", "Bjet.mass",
+        "MET.pt", "MET.eta", "MET.phi", "MET.mass",
+        },
+    produces={
+        "deltaR_ll", "ll_pt", "m_bb", "deltaR_bb", "bb_pt",
+        "MT", "min_dr_lljj", "delta_Phi", "m_lljjMET",
+        "lep1_pt", "lep2_pt",
+        },
+)
+def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
+
+    events = set_ak_column(events, "lep1_pt", events.Lepton[:,0].pt)
+    events = set_ak_column(events, "lep2_pt", events.Lepton[:,1].pt)
+
+    bb = (events.Bjet[:, 0] + events.Bjet[:, 1])
+    #m_bb = (events.Bjet[:, 0] + events.Bjet[:, 1]).mass
+    deltaR_bb = events.Bjet[:, 0].delta_r(events.Bjet[:, 1])
+    events = set_ak_column_f32(events, "m_bb", bb.mass)
+    events = set_ak_column_f32(events, "bb_pt", bb.pt)
+    events = set_ak_column_f32(events, "deltaR_bb", deltaR_bb)
+
+    ll = (events.Lepton[:, 0] + events.Lepton[:, 1])
+    deltaR_ll = events.Lepton[:, 0].delta_r(events.Lepton[:, 1])
+    #events = set_ak_column_f32(events, "m_ll", ll.mass)
+    events = set_ak_column_f32(events, "ll_pt", ll.pt)
+    events = set_ak_column_f32(events, "deltaR_ll", deltaR_ll)
+
+    lljj_pairs = ak.cartesian([events.Lepton, events.Bjet], axis=1)
+    l,j = ak.unzip(lljj_pairs) 
+    min_dr_lljj = ak.min(l.delta_r(j), axis=-1)  
+    #min_dr_lljj = ak.min(events.Bjet.delta_r(events.Lepton), axis=-1)
+    events = set_ak_column_f32(events, "min_dr_lljj", min_dr_lljj) 
+    
+    MT = (2 * events.MET.pt * ll.pt * (1 - np.cos(ll.delta_phi(events.MET)))) ** 0.5
+    events = set_ak_column_f32(events, "MT", MT)
+    events = set_ak_column_f32(events, "delta_Phi", abs(ll.delta_phi(bb)))
+    #events = set_ak_column_f32(events, "m_lljjMET", (ll + bb + 1*events.MET).mass)
+
+    # fill none values
+    for col in self.produces:
+        events = set_ak_column_f32(events, col, ak.fill_none(events[col], EMPTY_FLOAT))
+
+    return events
+
 
 @producer(
     uses={
         attach_coffea_behavior, prepare_objects, category_ids, event_weights,
-        bb_features, jj_features,
+        dilep_features,
         "Electron.pt", "Electron.eta", "Muon.pt", "Muon.eta",
+        "Lepton.pt",
         "Jet.pt", "Jet.eta", "Jet.btagDeepFlavB",
         "Bjet.btagDeepFlavB",
         "FatJet.pt", "FatJet.tau1", "FatJet.tau2",
+        "m_ll", "MET.pt", "channel_id",
     },
     produces={
         attach_coffea_behavior, category_ids, event_weights,
-        bb_features, jj_features,
-        "ht", "n_jet", "n_electron", "n_muon", "n_deepjet", "n_fatjet", "FatJet.tau21",
+        dilep_features,
+        "ht", "n_jet", "n_electron", "n_muon", "n_deepjet", "n_fatjet", "FatJet.tau21", "channel_id", "m_ll",
+        "lep1_pt", "lep2_pt", "E_miss", "m_lljjMET",
     },
 )
 def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
@@ -117,12 +167,19 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     wp_med = self.config_inst.x.btag_working_points.deepjet.medium
     events = set_ak_column(events, "n_deepjet", ak.sum(events.Jet.btagDeepFlavB > wp_med, axis=1))
     events = set_ak_column(events, "n_fatjet", ak.sum(events.FatJet.pt > 0, axis=1))
+    events = set_ak_column(events, "channel_id", events.channel_id)
+    events = set_ak_column(events, "m_ll", events.m_ll)
+    #events = set_ak_column(events, "lep1_pt", events.Lepton[:,0].pt)
+    #events = set_ak_column(events, "lep2_pt", events.Lepton[:,1].pt)
+    events = set_ak_column(events, "E_miss", events.MET[:].pt)
+    events = set_ak_column(events, "m_lljjMET",(events.Bjet[:,0] + events.Bjet[:,1] + events.Lepton[:,0] + events.Lepton[:,1] + events.MET[:]).mass)
 
     # Subjettiness
     events = set_ak_column_f32(events, "FatJet.tau21", events.FatJet.tau2 / events.FatJet.tau1)
 
-    events = self[bb_features](events, **kwargs)
-    events = self[jj_features](events, **kwargs)
+    events = self[dilep_features](events, **kwargs)
+    #events = self[bb_features](events, **kwargs)
+    #events = self[jj_features](events, **kwargs)
 
     # undo object padding (remove None entries)
     for obj in ["Jet", "Lightjet", "Bjet", "FatJet"]:

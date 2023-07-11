@@ -46,7 +46,7 @@ def apply_object_results(events: ak.Array, results: SelectionResult = None):
         {
             # attach_coffea_behavior,  # TODO use
             "Jet.pt", "Jet.eta", "Jet.phi", "Jet.mass", "Jet.btagDeepFlavB",
-            "MET.pt", "MET.phi",
+            "MET.pt", "MET.phi", #"event.channel_id",
         } |
         set(
             f"{obj}.{var}"

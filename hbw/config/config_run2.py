@@ -72,16 +72,27 @@ def add_config(
     # cfg.add_process(procs.n.vv)
     # cfg.add_process(procs.n.vv)
     cfg.add_process(procs.n.ggHH_kl_0_kt_1_sl_hbbhww)
+    cfg.add_process(procs.n.ggHH_kl_0_kt_1_dl_hbbhww)
     cfg.add_process(procs.n.ggHH_kl_1_kt_1_sl_hbbhww)
+    cfg.add_process(procs.n.ggHH_kl_1_kt_1_dl_hbbhww)
     cfg.add_process(procs.n.ggHH_kl_2p45_kt_1_sl_hbbhww)
+    cfg.add_process(procs.n.ggHH_kl_2p45_kt_1_dl_hbbhww)
     cfg.add_process(procs.n.ggHH_kl_5_kt_1_sl_hbbhww)
+    cfg.add_process(procs.n.ggHH_kl_5_kt_1_dl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_1_dl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_1_sl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_0_dl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_0_sl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_2_dl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_2_sl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_1_C2V_0_kl_1_sl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_1_C2V_0_kl_1_dl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_1_C2V_2_kl_1_sl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_1_C2V_2_kl_1_dl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww)
     cfg.add_process(procs.n.qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww)
+    cfg.add_process(procs.n.qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww)
     cfg.add_process(procs.n.hh_ggf_bbtautau)
 
     cfg.get_process("qcd_mu").label = "QCD Muon enriched"
@@ -160,16 +171,28 @@ def add_config(
         "ggHH_kl_2p45_kt_1_sl_hbbhww_custom",
         "ggHH_kl_5_kt_1_sl_hbbhww_custom",
         "ggHH_kl_0_kt_1_sl_hbbhww_powheg",
+        "ggHH_kl_0_kt_1_dl_hbbhww_powheg",
         "ggHH_kl_1_kt_1_sl_hbbhww_powheg",
+        "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
         "ggHH_kl_2p45_kt_1_sl_hbbhww_powheg",
+        "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
         "ggHH_kl_5_kt_1_sl_hbbhww_powheg",
+        "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
+        
         "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww_madgraph",
+        "qqHH_CV_1_C2V_1_kl_1_dl_hbbhww_madgraph",
         "qqHH_CV_1_C2V_1_kl_0_sl_hbbhww_madgraph",
+        "qqHH_CV_1_C2V_1_kl_0_dl_hbbhww_madgraph",
         "qqHH_CV_1_C2V_1_kl_2_sl_hbbhww_madgraph",
+        "qqHH_CV_1_C2V_1_kl_2_dl_hbbhww_madgraph",
         "qqHH_CV_1_C2V_0_kl_1_sl_hbbhww_madgraph",
+        "qqHH_CV_1_C2V_0_kl_1_dl_hbbhww_madgraph",
         "qqHH_CV_1_C2V_2_kl_1_sl_hbbhww_madgraph",
+        "qqHH_CV_1_C2V_2_kl_1_dl_hbbhww_madgraph",
         "qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww_madgraph",
+        "qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww_madgraph",
         "qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww_madgraph",
+        "qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww_madgraph",
         # HH(bbtautau)
         "hh_ggf_bbtautau_madgraph",
     ]
@@ -201,6 +224,11 @@ def add_config(
     cfg.x.default_inference_model = "default"
     cfg.x.default_categories = ["incl"]
 
+    #Channels
+    cfg.add_channel(name="ee", id=1)
+    cfg.add_channel(name="mumu", id=2)
+    cfg.add_channel(name="emu", id=3)
+
     # process groups for conveniently looping over certain processs
     # (used in wrapper_factory and during plotting)
     cfg.x.process_groups = {
@@ -224,7 +252,7 @@ def add_config(
     # (used in wrapper_factory and during plotting)
     cfg.x.dataset_groups = {
         "all": ["*"],
-        "default": ["ggHH_kl_1*", "tt_*", "qcd_*", "st_*", "dy_*", "w_lnu_*"],
+        "default": ["ggHH_kl_1_kt_1_sl_hbbhww_powheg", "tt_*", "st_*", "dy_*", "w_lnu_*"], #qcd processs excluded due to ERROR 
         "inference": ["ggHH_*", "tt_*", "qcd_*", "st_*", "dy_*", "w_lnu_*"],
         "test": ["ggHH_kl_1*", "tt_sl_powheg"],
         "small": ["ggHH_kl_1*", "tt_*", "st_*"],
@@ -248,6 +276,11 @@ def add_config(
     # (used during plotting)
     cfg.x.variable_groups = {
         "default": ["n_jet", "n_muon", "n_electron", "ht", "m_bb", "deltaR_bb", "jet1_pt"],  # n_deepjet, ....
+        "dilep": [
+            "n_jet", "n_muon", "n_electron", "ht", "m_bb", "m_ll", "deltaR_bb", "deltaR_ll", 
+            "ll_pt", "bb_pt", "E_miss", "delta_Phi", "MT", "min_dr_lljj", "lep1_pt", "lep2_pt"
+            "m_lljjMET", "channel_id"
+        ],    
         "test": ["n_jet", "n_electron", "jet1_pt"],
         "cutflow": ["cf_jet1_pt", "cf_jet4_pt", "cf_n_jet", "cf_n_electron", "cf_n_muon"],  # cf_n_deepjet
     }
@@ -266,6 +299,7 @@ def add_config(
         "default": ["Lepton", "VetoLepton", "Jet", "Bjet", "Trigger"],
         "thesis": ["Lepton", "Muon", "Jet", "Trigger", "Bjet"],  # reproduce master thesis cuts for checks
         "test": ["Lepton", "Jet", "Bjet"],
+        "dilep": ["Jet","Lepton","Trigger","TriggerAndLep","Bjet"],
     }
 
     cfg.x.selector_step_labels = {
@@ -290,6 +324,7 @@ def add_config(
             proc.name: {"unstack": True, "scale": 10000}
             for proc in cfg.processes if "HH" in proc.name
         },
+        "dilep": {"ggHH_kl_1_kt_sl_hbbhww": {"scale": 3000, "unstack": True}},
     }
     # when drawing DY as a line, use a different type of yellow
     cfg.x.process_settings_groups["unstack_all"].update({"dy_lep": {"unstack": True, "color": "#e6d800"}})
@@ -642,6 +677,7 @@ def add_config(
             "pu_weight*", "pdf_weight*",
             "murf_envelope_weight*", "mur_weight*", "muf_weight*",
             "btag_weight*",
+            "m_ll", "channel_id",
         } | set(  # Jets
             f"{jet_obj}.{field}"
             for jet_obj in ["Jet", "Bjet", "Lightjet", "VBFJet"]
