@@ -140,7 +140,7 @@ def add_config(
         "w_lnu_ht600To800_madgraph",
         "w_lnu_ht800To1200_madgraph",
         "w_lnu_ht1200To2500_madgraph",
-        "w_lnu_ht2500_madgraph",
+        #"w_lnu_ht2500_madgraph", # This datasets gets produce columns to fail, because no events are selected.  
         # DY
         "dy_lep_m50_ht70to100_madgraph",
         "dy_lep_m50_ht100to200_madgraph",
@@ -178,7 +178,7 @@ def add_config(
         "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
         "ggHH_kl_5_kt_1_sl_hbbhww_powheg",
         "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
-        
+        #no LHEScaleWeights 
         "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww_madgraph",
         "qqHH_CV_1_C2V_1_kl_1_dl_hbbhww_madgraph",
         "qqHH_CV_1_C2V_1_kl_0_sl_hbbhww_madgraph",
@@ -212,6 +212,8 @@ def add_config(
             dataset.x.is_ttbar = True
         if dataset.name.startswith("qcd"):
             dataset.x.is_qcd = True
+        if dataset.name.startswith("qqHH"):
+            dataset.x.is_qqHH = True
         if "HH" in dataset.name and "hbbhww" in dataset.name:
             dataset.x.is_hbw = True
 
@@ -257,6 +259,26 @@ def add_config(
         "test": ["ggHH_kl_1*", "tt_sl_powheg"],
         "small": ["ggHH_kl_1*", "tt_*", "st_*"],
         "bkg": ["tt_*", "st_*", "w_lnu_*", "dy_*"],
+        "dilep": [
+            "tt_*", "st_*", "dy_*",  "w_lnu_*",
+            "ggHH_kl_0_kt_1_sl_hbbhww_powheg", "ggHH_kl_0_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_1_kt_1_sl_hbbhww_powheg", "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_2p45_kt_1_sl_hbbhww_powheg", "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_5_kt_1_sl_hbbhww_powheg", "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
+            #"qqHH_CV_1_C2V_1_kl_0_sl_hbbhww_msdgraph", "qqHH_CV_1_C2V_1_kl_0_dl_hbbhww_madgraph",
+            #"qqHH_CV_1_C2V_1_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_1_C2V_1_kl_1_dl_hbbhww_madgraph",
+            #"qqHH_CV_1_C2V_1_kl_2_sl_hbbhww_msdgraph", "qqHH_CV_1_C2V_1_kl_2_dl_hbbhww_madgraph",
+            #"qqHH_CV_1_C2V_0_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_1_C2V_0_kl_1_dl_hbbhww_madgraph",
+            #"qqHH_CV_1_C2V_2_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_1_C2V_2_kl_1_dl_hbbhww_madgraph",
+            #"qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww_madgraph",
+            #"qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww_madgraph",
+        ],
+        "dilepsignal": [
+            "ggHH_kl_0_kt_1_sl_hbbhww_powheg", "ggHH_kl_0_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_1_kt_1_sl_hbbhww_powheg", "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_2p45_kt_1_sl_hbbhww_powheg", "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_5_kt_1_sl_hbbhww_powheg", "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
+        ],
         "tt": ["tt_*"], "st": ["st_*"], "w": ["w_lnu_*"], "dy": ["dy_*"],
         "qcd": ["qcd_*"], "qcd_mu": ["qcd_mu*"], "qcd_ele": ["qcd_em*", "qcd_bctoe*"],
         "signal": ["ggHH_*", "qqHH_*"], "gghh": ["ggHH_*"], "qqhh": ["qqHH_*"],
@@ -299,7 +321,7 @@ def add_config(
         "default": ["Lepton", "VetoLepton", "Jet", "Bjet", "Trigger"],
         "thesis": ["Lepton", "Muon", "Jet", "Trigger", "Bjet"],  # reproduce master thesis cuts for checks
         "test": ["Lepton", "Jet", "Bjet"],
-        "dilep": ["Jet","Lepton","Trigger","TriggerAndLep","Bjet"],
+        "dilep": ["Jet","Bjet","Lepton","Trigger","TriggerAndLep"],
     }
 
     cfg.x.selector_step_labels = {

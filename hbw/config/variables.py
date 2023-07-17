@@ -96,8 +96,14 @@ def add_feature_variables(config: od.Config) -> None:
     )
     config.add_variable(
         name="m_ll",
-        binning=(40, 10., 80.),
+        binning=(40, 0., 80.),
         x_title=r"$m_{ll}$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="m_ll2",
+        binning=(40, 0., 80.),
+        x_title=r"$m_{ll,test}$",
         unit="GeV",
     )
     config.add_variable(
@@ -116,6 +122,24 @@ def add_feature_variables(config: od.Config) -> None:
         name="ll_pt",
         binning=(40, 0., 300),
         x_title=r"$dilepton \,\, system \,\, p_T$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="lep1_pt",
+        binning=(40, 0., 300),
+        x_title=r"$lep1 \,\, p_T$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="lep2_pt",
+        binning=(40, 0., 300),
+        x_title=r"$lep2 \,\, p_T$",
+        unit="GeV",
+    )
+    config.add_variable(
+        name="charge",
+        binning=(40, 0., 300),
+        x_title=r"$Charge$",
         unit="GeV",
     )
     config.add_variable(

@@ -72,7 +72,7 @@ def bb_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     produces={
         "deltaR_ll", "ll_pt", "m_bb", "deltaR_bb", "bb_pt",
         "MT", "min_dr_lljj", "delta_Phi", "m_lljjMET",
-        "lep1_pt", "lep2_pt",
+        "lep1_pt", "lep2_pt", "m_ll2",
         },
 )
 def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
@@ -91,6 +91,7 @@ def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     deltaR_ll = events.Lepton[:, 0].delta_r(events.Lepton[:, 1])
     #events = set_ak_column_f32(events, "m_ll", ll.mass)
     events = set_ak_column_f32(events, "ll_pt", ll.pt)
+    events = set_ak_column_f32(events, "m_ll2", ll.mass)
     events = set_ak_column_f32(events, "deltaR_ll", deltaR_ll)
 
     lljj_pairs = ak.cartesian([events.Lepton, events.Bjet], axis=1)
@@ -126,7 +127,7 @@ def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
         attach_coffea_behavior, category_ids, event_weights,
         dilep_features,
         "ht", "n_jet", "n_electron", "n_muon", "n_deepjet", "n_fatjet", "FatJet.tau21", "channel_id", "m_ll",
-        "lep1_pt", "lep2_pt", "E_miss", "m_lljjMET",
+        "lep1_pt", "lep2_pt", "E_miss", "m_lljjMET", "charge",
     },
 )
 def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
@@ -169,8 +170,9 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column(events, "n_fatjet", ak.sum(events.FatJet.pt > 0, axis=1))
     events = set_ak_column(events, "channel_id", events.channel_id)
     events = set_ak_column(events, "m_ll", events.m_ll)
-    #events = set_ak_column(events, "lep1_pt", events.Lepton[:,0].pt)
-    #events = set_ak_column(events, "lep2_pt", events.Lepton[:,1].pt)
+    events = set_ak_column(events, "charge", events.charge)
+    events = set_ak_column(events, "lep1_pt", events.Lepton[:,0].pt)
+    events = set_ak_column(events, "lep2_pt", events.Lepton[:,1].pt)
     events = set_ak_column(events, "E_miss", events.MET[:].pt)
     events = set_ak_column(events, "m_lljjMET",(events.Bjet[:,0] + events.Bjet[:,1] + events.Lepton[:,0] + events.Lepton[:,1] + events.MET[:]).mass)
 

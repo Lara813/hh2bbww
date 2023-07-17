@@ -493,7 +493,7 @@ def dilep_selection(
     # create lepton particles with given attributes 
     leptons = ak.concatenate([muon[mu_mask_loose], electron[e_mask_loose]], axis = -1)
     leptons = leptons[ak.argsort(leptons.pt, axis = -1, ascending = False)]
-    pt = ak.fill_none(ak.pad_none(leptons.pt, 2, axis=-1), -999)
+    #pt = ak.fill_none(ak.pad_none(leptons.pt, 2, axis=-1), -999)
     #eta = ak.fill_none(ak.pad_none(leptons.eta, 2, axis=-1), -999)
     #phi = ak.fill_none(ak.pad_none(leptons.phi, 2, axis=-1), -999)
     #mass = ak.fill_none(ak.pad_none(leptons.mass, 2, axis=-1), -999)
@@ -508,9 +508,8 @@ def dilep_selection(
     fill_with = {
         "pt": -999, "eta": -999, "phi": -999, "charge": -999, 
         "pdgId": -999, "mass": -999, "e_idx": -999, "mu_idx": -999}
-    leptons = ak.pad_none(leptons, 2, axis = -1)
+    leptons = ak.fill_none(ak.pad_none(leptons, 2, axis = -1), fill_with)
     #leptons = ak.drop_none(leptons, axis=1) 
-    leptons = ak.fill_none(leptons, fill_with)
     #__import__("IPython").embed()
     # mumu mask 
     mm_mask = (
@@ -563,11 +562,12 @@ def dilep_selection(
 
     # lepton mask
     ll_mask = mm_mask | ee_mask | em_mask
-   
+    #__import__("IPython").embed()  
     # save muon and electron indices selected by mask
     empty_indices = empty_events[..., None][..., :0]
     e_indices = ak.where(ll_mask, leptons.e_idx, empty_indices)
     mu_indices = ak.where(ll_mask, leptons.mu_idx, empty_indices)
+    #__import__("IPython").embed()  
     #e_indices = ak.mask(e_indices, e_indices != -999) 
     #mu_indices = ak.mask(mu_indices, mu_indices != -999) 
     #e_indices = ak.where(ll_mask, e_indices, empty_indices)
