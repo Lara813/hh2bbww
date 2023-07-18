@@ -101,7 +101,7 @@ def add_feature_variables(config: od.Config) -> None:
         unit="GeV",
     )
     config.add_variable(
-        name="m_ll2",
+        name="m_ll_check",
         binning=(40, 0., 80.),
         x_title=r"$m_{ll,test}$",
         unit="GeV",
@@ -126,21 +126,21 @@ def add_feature_variables(config: od.Config) -> None:
     )
     config.add_variable(
         name="lep1_pt",
-        binning=(40, 0., 300),
+        binning=(40, 0., 200),
         x_title=r"$lep1 \,\, p_T$",
         unit="GeV",
     )
     config.add_variable(
         name="lep2_pt",
-        binning=(40, 0., 300),
+        binning=(40, 0., 200),
         x_title=r"$lep2 \,\, p_T$",
         unit="GeV",
     )
     config.add_variable(
         name="charge",
-        binning=(40, 0., 300),
+        binning=(1, -10., 10.),
         x_title=r"$Charge$",
-        unit="GeV",
+     #   unit="GeV",
     )
     config.add_variable(
         name="bb_pt",

@@ -92,8 +92,8 @@ def add_categories_production(config: od.Config) -> None:
     cat_2mu = config.get_category("2mu")
     cat_2mu.selection = "catid_2mu"
 
-    cat_emu = config.get_category("2mu")
-    cat_emu.selection = "catid_2mu"
+    cat_emu = config.get_category("emu")
+    cat_emu.selection = "catid_emu"
 
     cat_1mu = config.get_category("1mu")
     cat_1mu.selection = "catid_1mu"

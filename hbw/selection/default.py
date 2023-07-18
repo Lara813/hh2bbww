@@ -245,21 +245,21 @@ def jet_selection(
         ak.all(events.Jet.metric_table(lepton_results.x.lepton) > 0.3, axis=2)
     )
     events = set_ak_column(events, "cutflow.n_jet", ak.sum(jet_mask, axis=1))
-    jet_sel = events.cutflow.n_jet <= 3
+    jet_sel = events.cutflow.n_jet >= 2
     jet_indices = masked_sorted_indices(jet_mask, events.Jet.pt)
 
     # b-tagged jets, medium working point
     wp_med = self.config_inst.x.btag_working_points.deepjet.medium
-    btag_mask = (jet_mask) & (events.Jet.btagDeepFlavB >= wp_med)
-    events = set_ak_column(events, "cutflow.n_deepjet_med", ak.sum(btag_mask, axis=1))
-    btag_sel = events.cutflow.n_deepjet_med >= 2 #TODO: whether this should be 2 or 1 
+    #btag_mask = (jet_mask) & (events.Jet.btagDeepFlavB >= wp_med)
+    #events = set_ak_column(events, "cutflow.n_deepjet_med", ak.sum(btag_mask, axis=1))
+    #btag_sel = events.cutflow.n_deepjet_med >= 2 #TODO: whether this should be 2 or 1 
 
     # define b-jets as the two b-score leading jets, b-score sorted
     bjet_indices = masked_sorted_indices(jet_mask, events.Jet.btagDeepFlavB)# chose two, otherwise chose two with biggest vertex see below [:, :2]
 
     # define lightjets as all non b-jets, pt-sorted
-    b_idx = ak.fill_none(ak.pad_none(bjet_indices, 2), -1)
-    lightjet_indices = jet_indices[(jet_indices != b_idx[:, 0]) & (jet_indices != b_idx[:, 1])]
+    #b_idx = ak.fill_none(ak.pad_none(bjet_indices, 2), -1)
+    #lightjet_indices = jet_indices[(jet_indices != b_idx[:, 0]) & (jet_indices != b_idx[:, 1])]
     
     #chose jets with max vertex and previous selection: 
     bjet_pairs = ak.combinations(events.Jet[bjet_indices], 2)
@@ -270,7 +270,12 @@ def jet_selection(
     bjets = ak.concatenate([bjet1, bjet2], axis=1)
     bjets = bjets[ak.argsort(bjets.pt, ascending=False)]
     bjet_indices = bjets.local_index
-    bjet_sel = ak.num(bjet_indices, axis=-1) == 2
+    jet_sel = ak.num(bjet_indices, axis=-1) == 2
+    
+    btag_mask = (jet_mask) & (events.Jet.btagDeepFlavB >= wp_med)
+    events = set_ak_column(events, "cutflow.n_deepjet_med", ak.sum(btag_mask, axis=1))
+    bjet_sel = events.cutflow.n_deepjet_med >= 2 #TODO: whether this should be 2 or 1 
+    __import__("IPython").embed()
     # build and return selection results plus new columns
     return events, SelectionResult(
         steps={"Jet": jet_sel, "Bjet": bjet_sel},
@@ -279,7 +284,7 @@ def jet_selection(
                 "LooseJet": masked_sorted_indices(jet_mask_loose, events.Jet.pt),
                 "Jet": jet_indices,
                 "Bjet": bjet_indices,
-                "Lightjet": lightjet_indices,
+                #"Lightjet": lightjet_indices,
             },
         },
         aux={
@@ -298,12 +303,12 @@ def jet_selection(
         "Muon.charge", "Muon.pdgId",
         "Tau.pt", "Tau.eta",
      },
-    # produces={"m_ll2", "channel_id"},
+    produces={"m_ll", "channel_id"},
     e_pt=None, mu_pt=None, e_trigger=None, mu_trigger=None, 
     ee_trigger=None, mm_trigger=None, emu_trigger=None, mue_trigger=None,
     #e_trigger=None, mu_trigger=None,
 )
-def Testdilep_selection(
+def dilep_selection(
         self: Selector, 
         events: ak.Array,
         stats: defaultdict,
@@ -336,10 +341,15 @@ def Testdilep_selection(
         (muon.tightId) &
         (muon.pfRelIso04_all < 0.15)
     ) 
-    __import__("IPython").embed()
+    electron['e_idx'] = ak.local_index(electron, axis=1)
+    muon['mu_idx'] = ak.local_index(muon, axis=1)
+    electron, muon = ak.broadcast_fields(electron, muon)  
+    electron = ak.without_parameters(electron)
+    muon = ak.without_parameters(muon)
+    #__import__("IPython").embed()
     leptons = ak.concatenate([muon[mu_mask_loose], electron[e_mask_loose]], axis = -1)
     leptons = leptons[ak.argsort(leptons.pt, axis = -1, ascending = False)]
-    fill_with = {"pt": -999, "eta": -999, "phi": -999, "charge": -999, "pdgId": -999}
+    fill_with = {"pt": -999, "eta": -999, "phi": -999, "charge": -999, "pdgId": -999, "mass": -999, "e_idx": -999, "mu_idx": -999}
     leptons = ak.fill_none(ak.pad_none(leptons, 2, axis = -1), fill_with)
     
     # TODO: Include mll cut and leading pT cut
@@ -347,7 +357,9 @@ def Testdilep_selection(
                 (ak.num(leptons.pdgId, axis = -1) == 2) &
                 (abs(leptons.pdgId[:, 0]) == 13) &
                 (abs(leptons.pdgId[:, 1]) == 13) &
-                # (leptons.pt[:, 0] > 20) &
+                (leptons.pt[:, 0] > 20) &
+                (invariant_mass(leptons) > 12)  &
+                (invariant_mass(leptons) < 76) &
                 (ak.sum(leptons.charge, axis = -1) == 0)
               )
 
@@ -355,7 +367,9 @@ def Testdilep_selection(
                 (ak.num(leptons.pdgId, axis = -1) == 2) &
                 (abs(leptons.pdgId[:, 0]) == 11) &
                 (abs(leptons.pdgId[:, 1]) == 11) &
-                # (leptons.pt[:, 0] > 25) &
+                (leptons.pt[:, 0] > 25) &
+                (invariant_mass(leptons) > 12)  &
+                (invariant_mass(leptons) < 76) &
                 (ak.sum(leptons.charge, axis = -1) == 0)
               )
 
@@ -367,13 +381,24 @@ def Testdilep_selection(
                     (abs(leptons.pdgId[:, 0]) == 13) &
                     (abs(leptons.pdgId[:, 1]) == 11)
                 ) &
-                # (leptons.pt[:, 0] > 25) &
+                (leptons.pt[:, 0] > 25) &
+                (invariant_mass(leptons) > 12)  &
+                (invariant_mass(leptons) < 76) &
                 (ak.sum(leptons.charge, axis = -1) == 0)
               )
 
 
     # TODO: Implement channel assignment
     # ch = 
+    empty_events = ak.zeros_like(1*events.event, dtype=np.uint16)
+    channel_id = ak.zeros_like(empty_events)
+    channel_id = ak.where(mm_mask, ak.full_like(events.event, 1), channel_id)
+    channel_id = ak.where(ee_mask, ak.full_like(events.event, 2), channel_id)
+    channel_id = ak.where(em_mask, ak.full_like(events.event, 3), channel_id)
+    leptons['channel_id'] = channel_id
+    events = set_ak_column(events, "channel_id", channel_id)
+    leptons['m_ll'] = channel_id
+    events = set_ak_column(events, "m_ll", invariant_mass(leptons))
 
     # ch = ak.where(mm_mask, ak.full_like(leptons['channel'], 1), leptons['channel'])
     # ch = ak.where(ee_mask, ak.full_like(leptons['channel'], 2), ch)
@@ -383,18 +408,36 @@ def Testdilep_selection(
 
     ll_mask = mm_mask | ee_mask | em_mask
 
+    empty_indices = empty_events[..., None][..., :0]
+    e_indices = ak.where(ll_mask, leptons.e_idx, empty_indices)
+    mu_indices = ak.where(ll_mask, leptons.mu_idx, empty_indices)
+    e_indices_l = ak.drop_none(e_indices)
+    mu_indices_l = ak.drop_none(mu_indices)
+    lep_sel = (ak.num(e_indices_l, axis=-1) + ak.num(mu_indices_l, axis=-1)) == 2
+    e_sel = ak.num(e_indices_l, axis=-1) >=1
+    mu_sel = ak.num(mu_indices_l, axis=-1) >=1
     # TODO: Implement Triggers
-
+    mm_trigger_sel = ones if not self.mm_trigger else events.HLT[self.mm_trigger]
+    ee_trigger_sel = ones if not self.ee_trigger else events.HLT[self.ee_trigger]
+    emu_trigger_sel = ones if not self.emu_trigger else events.HLT[self.emu_trigger]
+    mue_trigger_sel = ones if not self.mue_trigger else events.HLT[self.mue_trigger]
+    mixed_trigger_sel = emu_trigger_sel | mue_trigger_sel
+    trigger_sel = mm_trigger_sel | ee_trigger_sel | mixed_trigger_sel 
+    trigger_lep_crosscheck = (
+        (ee_trigger_sel & ee_mask) |
+        (mm_trigger_sel & mm_mask) |
+        (mixed_trigger_sel & em_mask)
+    )
     e_indices = masked_sorted_indices(e_mask_loose, electron.pt)
     mu_indices = masked_sorted_indices(mu_mask_loose, muon.pt)
 
     return events, SelectionResult(
         steps={
-            "Muon": mm_mask, "Electron": ee_mask,
+            #"Muon": mu_sel, "Electron": e_sel,
             "Lepton": ll_mask, "VetoLepton": lep_veto_sel,
             "VetoTau": tau_veto_sel,
             # "MuTrigger": mu_trigger_sel, "EleTrigger": e_trigger_sel,
-            # "Trigger": trigger_sel, "TriggerAndLep": trigger_lep_crosscheck,
+            "Trigger": trigger_sel, "TriggerAndLep": trigger_lep_crosscheck,
         },
         objects={
             "Electron": {
@@ -410,7 +453,11 @@ def Testdilep_selection(
         aux={
             # save the selected lepton for the duration of the selection
             # multiplication of a coffea particle with 1 yields the lorentz vector
-            "lepton": leptons
+            "lepton": leptons # ak.concatenate(
+                #[
+                #    events.Electron[e_indices_l] * 1, 
+                #    events.Muon[mu_indices_l] * 1,
+                #], axis=1), 
         },
     )
 
@@ -428,7 +475,7 @@ def Testdilep_selection(
     e_pt=None, mu_pt=None, e_trigger=None, mu_trigger=None, 
     ee_trigger=None, mm_trigger=None, emu_trigger=None, mue_trigger=None,
 )
-def dilep_selection(
+def  VLdilep_selection(
         self: Selector, 
         events: ak.Array,
         stats: defaultdict,
@@ -477,17 +524,17 @@ def dilep_selection(
         
     #empty_events = ak.zeros_like(1*events.Electron, dtype=np.uint16)
     #empty_idx = empty_events[..., None][..., :0]
-    electron['e_idx'] = ak.local_index(electron, axis=1)
+    #electron['e_idx'] = ak.local_index(electron, axis=1)
     #electron['mu_idx'] = empty_idx
-    muon['mu_idx'] = ak.local_index(muon, axis=1)
+    #muon['mu_idx'] = ak.local_index(muon, axis=1)
     #muon_e_idx = ak.full_like(muon.mu_idx, -999)
     #empty_events = ak.zeros_like(1*events.Muon, dtype=np.uint16)
     #empty_idx = empty_events[..., None][.]
     #muon['e_idx'] = empty_idx   
-    electron, muon = ak.broadcast_fields(electron, muon)  
+    #electron, muon = ak.broadcast_fields(electron, muon)  
 
-    electron = ak.without_parameters(electron)
-    muon = ak.without_parameters(muon)
+    #electron = ak.without_parameters(electron)
+    #muon = ak.without_parameters(muon)
     #__import__("IPython").embed()
 
     # create lepton particles with given attributes 
@@ -564,48 +611,48 @@ def dilep_selection(
     ll_mask = mm_mask | ee_mask | em_mask
     #__import__("IPython").embed()  
     # save muon and electron indices selected by mask
-    empty_indices = empty_events[..., None][..., :0]
-    e_indices = ak.where(ll_mask, leptons.e_idx, empty_indices)
-    mu_indices = ak.where(ll_mask, leptons.mu_idx, empty_indices)
+    #empty_indices = empty_events[..., None][..., :0]
+    #e_indices = ak.where(ll_mask, leptons.e_idx, empty_indices)
+    #mu_indices = ak.where(ll_mask, leptons.mu_idx, empty_indices)
     #__import__("IPython").embed()  
     #e_indices = ak.mask(e_indices, e_indices != -999) 
     #mu_indices = ak.mask(mu_indices, mu_indices != -999) 
     #e_indices = ak.where(ll_mask, e_indices, empty_indices)
     #mu_indices = ak.where(ll_mask, mu_indices, empty_indices)
-    e_indices = ak.drop_none(e_indices)
-    mu_indices = ak.drop_none(mu_indices) 
+    #e_indices = ak.drop_none(e_indices)
+    #mu_indices = ak.drop_none(mu_indices) 
 
     #Selection based on final lepton indices
-    lep_sel = (ak.num(e_indices, axis=-1) + ak.num(mu_indices, axis=-1)) == 2
-    e_sel = ak.num(e_indices, axis=-1) >=1
-    mu_sel = ak.num(mu_indices, axis=-1) >=1
+    #lep_sel = (ak.num(e_indices, axis=-1) + ak.num(mu_indices, axis=-1)) == 2
+    #e_sel = ak.num(e_indices, axis=-1) >=1
+    #mu_sel = ak.num(mu_indices, axis=-1) >=1
     
     #dummy mask for Triggers 
-    ones = ak.ones_like(lep_sel)
+    #ones = ak.ones_like(lep_sel)
     
     # trigger masks
-    mm_trigger_sel = ones if not self.mm_trigger else events.HLT[self.mm_trigger]
-    ee_trigger_sel = ones if not self.ee_trigger else events.HLT[self.ee_trigger]    
-    emu_trigger_sel = ones if not self.emu_trigger else events.HLT[self.emu_trigger]
-    mue_trigger_sel = ones if not self.mue_trigger else events.HLT[self.mue_trigger]
-    mixed_trigger_sel = emu_trigger_sel | mue_trigger_sel
+    #mm_trigger_sel = ones if not self.mm_trigger else events.HLT[self.mm_trigger]
+    #ee_trigger_sel = ones if not self.ee_trigger else events.HLT[self.ee_trigger]    
+    #emu_trigger_sel = ones if not self.emu_trigger else events.HLT[self.emu_trigger]
+    #mue_trigger_sel = ones if not self.mue_trigger else events.HLT[self.mue_trigger]
+    #mixed_trigger_sel = emu_trigger_sel | mue_trigger_sel
     #e_trigger_sel = mixed_trigger_sel | ee_trigger_sel
     #m_trigger_sel = mixed_trigger_sel | mm_trigger_sel
-    trigger_sel = mm_trigger_sel | ee_trigger_sel | mixed_trigger_sel 
-    trigger_lep_crosscheck = (
-        (ee_trigger_sel & ee_mask) |
-        (mm_trigger_sel & mm_mask) |
-        (mixed_trigger_sel & em_mask)
-    )
+    #trigger_sel = mm_trigger_sel | ee_trigger_sel | mixed_trigger_sel 
+    #trigger_lep_crosscheck = (
+    #    (ee_trigger_sel & ee_mask) |
+    #    (mm_trigger_sel & mm_mask) |
+    #    (mixed_trigger_sel & em_mask)
+    #)
     #__import__("IPython").embed()
 
     return events, SelectionResult(
         steps={
-            "Muon": mu_sel, "Electron": e_sel,
-            "Lepton": lep_sel, "VetoLepton": lep_veto_sel,
+            "Muon": mu_indices, "Electron": e_indices,
+            "Lepton": ll_mask, "VetoLepton": lep_veto_sel,
             "VetoTau": tau_veto_sel,
-            "mmTrigger": mm_trigger_sel, "eeTrigger": ee_trigger_sel, "mixedtrigger": mixed_trigger_sel,
-            "Trigger": trigger_sel, "TriggerAndLep": trigger_lep_crosscheck,
+            #"mmTrigger": mm_trigger_sel, "eeTrigger": ee_trigger_sel, "mixedtrigger": mixed_trigger_sel,
+            #"Trigger": trigger_sel, "TriggerAndLep": trigger_lep_crosscheck,
         },
         objects={
             "Electron": {
@@ -621,12 +668,12 @@ def dilep_selection(
         aux={
             # save the selected lepton for the duration of the selection
             # multiplication of a coffea particle with 1 yields the lorentz vector
-            "lepton": ak.concatenate(
-                [
-                    events.Electron[e_indices] * 1, 
-                    events.Muon[mu_indices] * 1,
-                ], axis=1
-            ),
+            "lepton": leptons #ak.concatenate(
+                #[
+                #    events.Electron[e_indices] * 1, 
+                #    events.Muon[mu_indices] * 1,
+                #], axis=1
+            #),
         },
     )
 
