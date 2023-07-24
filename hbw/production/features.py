@@ -95,11 +95,11 @@ def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column_f32(events, "deltaR_ll", deltaR_ll)
 
     lljj_pairs = ak.cartesian([events.Lepton, events.Bjet], axis=1)
-    l,j = ak.unzip(lljj_pairs) 
-    min_dr_lljj = ak.min(l.delta_r(j), axis=-1)  
+    lep,jet = ak.unzip(lljj_pairs) 
+    min_dr_lljj = ak.drop_none(ak.min(lep.delta_r(jet), axis=-1))  
     #min_dr_lljj = ak.min(events.Bjet.delta_r(events.Lepton), axis=-1)
     events = set_ak_column_f32(events, "min_dr_lljj", min_dr_lljj) 
-    
+    #__import__("IPython").embed() 
     MT = (2 * events.MET.pt * ll.pt * (1 - np.cos(ll.delta_phi(events.MET)))) ** 0.5
     events = set_ak_column_f32(events, "MT", MT)
     events = set_ak_column_f32(events, "delta_Phi", abs(ll.delta_phi(bb)))
@@ -119,7 +119,7 @@ def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
         "Electron.pt", "Electron.eta", "Muon.pt", "Muon.eta",
         "Lepton.pt", "Lepton.charge",
         "Jet.pt", "Jet.eta", "Jet.btagDeepFlavB",
-        "Bjet.btagDeepFlavB",
+        "Bjet.btagDeepFlavB", "Bjet.pt",
         "FatJet.pt", "FatJet.tau1", "FatJet.tau2",
         "m_ll", "MET.pt", "channel_id", "Electron.charge", "Muon.charge",
     },
@@ -127,7 +127,7 @@ def dilep_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
         attach_coffea_behavior, category_ids, event_weights,
         dilep_features,
         "ht", "n_jet", "n_electron", "n_muon", "n_deepjet", "n_fatjet", "FatJet.tau21", "channel_id", "m_ll",
-        "lep1_pt", "lep2_pt", "E_miss", "m_lljjMET", "charge",
+        "lep1_pt", "lep2_pt", "E_miss", "m_lljjMET", "charge", "n_bjet", "wp_score",
     },
 )
 def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
@@ -163,6 +163,8 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     # ht and number of objects (safe for None entries)
     events = set_ak_column_f32(events, "ht", ak.sum(events.Jet.pt, axis=1))
     events = set_ak_column(events, "n_jet", ak.sum(events.Jet.pt > 0, axis=1))
+    events = set_ak_column(events, "n_bjet", ak.sum(events.Bjet.pt > 0, axis=1))
+    events = set_ak_column(events, "wp_score", events.Bjet.btagDeepFlavB)
     events = set_ak_column(events, "n_electron", ak.sum(events.Electron.pt > 0, axis=1))
     events = set_ak_column(events, "n_muon", ak.sum(events.Muon.pt > 0, axis=1))
     wp_med = self.config_inst.x.btag_working_points.deepjet.medium
@@ -171,7 +173,7 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column(events, "channel_id", events.channel_id)
     events = set_ak_column(events, "m_ll", events.m_ll)
     #__import__("IPython").embed()
-    events = set_ak_column(events, "charge", (events.Lepton.charge[:,:]))
+    events = set_ak_column(events, "charge", (events.Lepton.charge))
     events = set_ak_column(events, "lep1_pt", events.Lepton[:,0].pt)
     events = set_ak_column(events, "lep2_pt", events.Lepton[:,1].pt)
     events = set_ak_column(events, "E_miss", events.MET[:].pt)

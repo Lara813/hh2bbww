@@ -39,6 +39,17 @@ def add_feature_variables(config: od.Config) -> None:
         discrete_x=True,
     )
     config.add_variable(
+        name="n_bjet",
+        binning=(4, -0.5, 3.5),
+        x_title="Number of bjets",
+        discrete_x=True,
+    )
+    config.add_variable(
+        name="wp_score",
+        binning=(20, -0.5, 1.5),
+        x_title="wp score",
+    )
+    config.add_variable(
         name="n_electron",
         binning=(3, -0.5, 2.5),
         x_title="Number of electrons",
@@ -114,7 +125,7 @@ def add_feature_variables(config: od.Config) -> None:
     )
     config.add_variable(
         name="channel_id",
-        binning=(5, -0.5, 5),
+        binning=(6, -0.5, 5.5),
         x_title="Channel Id",
         discrete_x=True,
     )
@@ -127,19 +138,20 @@ def add_feature_variables(config: od.Config) -> None:
     config.add_variable(
         name="lep1_pt",
         binning=(40, 0., 200),
-        x_title=r"$lep1 \,\, p_T$",
+        x_title=r"$Leading\,\, lepton \,\, p_T$",
         unit="GeV",
     )
     config.add_variable(
         name="lep2_pt",
         binning=(40, 0., 200),
-        x_title=r"$lep2 \,\, p_T$",
+        x_title=r"$Subleading \,\, lepton \,\, p_T$",
         unit="GeV",
     )
     config.add_variable(
         name="charge",
-        binning=(1, -10., 10.),
+        binning=(3, -1.5, 1.5),
         x_title=r"$Charge$",
+        discrete_x=True,
      #   unit="GeV",
     )
     config.add_variable(
@@ -151,24 +163,24 @@ def add_feature_variables(config: od.Config) -> None:
     config.add_variable(
         name="deltaR_ll",
         binning=(40, 0., 4),
-        x_title=r"\Delta R (l,l)",
+        x_title=r"$\Delta R (l,l)$",
     )
     config.add_variable(
         name="E_miss",
-        binning=(40, 0., 400),
-        x_title="MET",
+        binning=(40, 0., 250),
+        x_title=r"$E_T \not$",
         unit="GeV",
     )
     config.add_variable(
         name="MT",
-        binning=(40, 0., 400),
-        x_title=r"$ \not{E_T}$",
+        binning=(40, 0., 300),
+        x_title=r"$MT$",
         unit="GeV",
     )
     config.add_variable(
-        name="min_dr_ljj",
+        name="min_dr_lljj",
         binning=(40, 0, 4),
-        x_title=r"$\textrm{min} \Delta R(l,j)$",
+        x_title=r"$min \Delta R(l,b)$",
     )
     config.add_variable(
         name="delta_Phi",

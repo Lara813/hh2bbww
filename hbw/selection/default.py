@@ -250,6 +250,7 @@ def jet_selection(
 
     # b-tagged jets, medium working point
     wp_med = self.config_inst.x.btag_working_points.deepjet.medium
+    #__import__("IPython").embed()
     #btag_mask = (jet_mask) & (events.Jet.btagDeepFlavB >= wp_med)
     #events = set_ak_column(events, "cutflow.n_deepjet_med", ak.sum(btag_mask, axis=1))
     #btag_sel = events.cutflow.n_deepjet_med >= 2 #TODO: whether this should be 2 or 1 
@@ -275,7 +276,7 @@ def jet_selection(
     btag_mask = (jet_mask) & (events.Jet.btagDeepFlavB >= wp_med)
     events = set_ak_column(events, "cutflow.n_deepjet_med", ak.sum(btag_mask, axis=1))
     bjet_sel = events.cutflow.n_deepjet_med >= 2 #TODO: whether this should be 2 or 1 
-    __import__("IPython").embed()
+    #__import__("IPython").embed()
     # build and return selection results plus new columns
     return events, SelectionResult(
         steps={"Jet": jet_sel, "Bjet": bjet_sel},

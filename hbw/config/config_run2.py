@@ -1,4 +1,5 @@
 # coding: utf-8
+    
 
 """
 Configuration of the 2017 HH -> bbWW analysis.
@@ -273,11 +274,17 @@ def add_config(
             #"qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww_madgraph",
             #"qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww_msdgraph", "qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww_madgraph",
         ],
+        "withEvents": [
+            "ggHH_kl_0_kt_1_dl_hbbhww_powheg", "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg", "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
+            "tt_dl_powheg", "tt_sl_powheg", "st_", "dy_*",
+            "st_*",
+        ],
         "dilepsignal": [
-            "ggHH_kl_0_kt_1_sl_hbbhww_powheg", "ggHH_kl_0_kt_1_dl_hbbhww_powheg",
-            "ggHH_kl_1_kt_1_sl_hbbhww_powheg", "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
-            "ggHH_kl_2p45_kt_1_sl_hbbhww_powheg", "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
-            "ggHH_kl_5_kt_1_sl_hbbhww_powheg", "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_0_kt_1_dl_hbbhww_powheg", #"ggHH_kl_0_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_1_kt_1_dl_hbbhww_powheg", #"ggHH_kl_1_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg", #"ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
+            "ggHH_kl_5_kt_1_dl_hbbhww_powheg", #"ggHH_kl_5_kt_1_dl_hbbhww_powheg",
         ],
         "tt": ["tt_*"], "st": ["st_*"], "w": ["w_lnu_*"], "dy": ["dy_*"],
         "qcd": ["qcd_*"], "qcd_mu": ["qcd_mu*"], "qcd_ele": ["qcd_em*", "qcd_bctoe*"],
@@ -292,6 +299,7 @@ def add_config(
         "ech": ["1e", "1e__resolved", "1e__boosted"],
         "default": ["incl", "1e", "1mu"],
         "test": ["incl", "1e"],
+        "dilep": ["incl", "ee", "2mu","emu"],
     }
 
     # variable groups for conveniently looping over certain variables
@@ -301,10 +309,11 @@ def add_config(
         "dilep": [
             "n_jet", "n_muon", "n_electron", "ht", "m_bb", "m_ll", "deltaR_bb", "deltaR_ll", 
             "ll_pt", "bb_pt", "E_miss", "delta_Phi", "MT", "min_dr_lljj", "lep1_pt", "lep2_pt"
-            "m_lljjMET", "channel_id"
+            "m_lljjMET", "channel_id", "n_bjet", "wp_score", "charge", "m_ll_check", 
         ],    
         "test": ["n_jet", "n_electron", "jet1_pt"],
         "cutflow": ["cf_jet1_pt", "cf_jet4_pt", "cf_n_jet", "cf_n_electron", "cf_n_muon"],  # cf_n_deepjet
+        "test2D": ["m_ll", "m_bb"],
     }
 
     # shift groups for conveniently looping over certain shifts
@@ -339,14 +348,15 @@ def add_config(
         "default_norm": {"shape_norm": True, "yscale": "log"},
     }
     cfg.x.process_settings_groups = {
-        "default": {"ggHH_kl_1_kt_1_sl_hbbhww": {"scale": 2000, "unstack": True}},
+        "default": {"ggHH_kl_1_kt_1_dl_hbbhww": {"scale": 50000, "unstack": True}},
         "unstack_all": {proc.name: {"unstack": True} for proc in cfg.processes},
         "unstack_signal": {proc.name: {"unstack": True} for proc in cfg.processes if "HH" in proc.name},
         "scale_signal": {
             proc.name: {"unstack": True, "scale": 10000}
             for proc in cfg.processes if "HH" in proc.name
         },
-        "dilep": {"ggHH_kl_1_kt_sl_hbbhww": {"scale": 3000, "unstack": True}},
+        "dilep": {"ggHH_kl_0_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True}, "ggHH_kl_1_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
+        "ggHH_kl_2p45_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True}, "ggHH_kl_5_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True}},
     }
     # when drawing DY as a line, use a different type of yellow
     cfg.x.process_settings_groups["unstack_all"].update({"dy_lep": {"unstack": True, "color": "#e6d800"}})
