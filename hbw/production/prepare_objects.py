@@ -68,7 +68,6 @@ def apply_object_results(events: ak.Array, results: SelectionResult = None):
     """
     if not results:
         return events
-
     # loop through all object selection, go through their masks and create new collections if required
     for src_name in results.objects.keys():
         # get all destination collections, handling those named identically to the source collection last
@@ -102,6 +101,7 @@ def prepare_objects(self: Producer, events: ak.Array, results: SelectionResult =
     events = apply_object_results(events, results)
 
     if "Bjet" not in events.fields and "Jet" in events.fields:
+        __import__("IPython").embed() 
         logger.warning("Bjet collection is missing: will be defined using the Jet collection")
         # define b-jets as the two b-score leading jets, b-score sorted
         bjet_indices = ak.argsort(events.Jet.btagDeepFlavB, axis=-1, ascending=False)

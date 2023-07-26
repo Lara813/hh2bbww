@@ -40,6 +40,27 @@ def add_categories_selection(config: od.Config) -> None:
         label="1 Muon",
     )
 
+    cat_ee = config.add_category(  # noqa
+        name="ee",
+        id=3000,
+        selection="catid_selection_ee",
+        label="2 Electron",
+    )
+
+    cat_2mu = config.add_category(  # noqa
+        name="2mu",
+        id=4000,
+        selection="catid_selection_2mu",
+        label="2 Muon",
+    )
+
+    cat_emu = config.add_category(  # noqa
+        name="emu",
+        id=5000,
+        selection="catid_selection_emu",
+        label="1 Electron 1 Muon",
+    )
+
 
 def name_fn(root_cats):
     cat_name = "__".join(cat.name for cat in root_cats.values())
@@ -67,6 +88,16 @@ def add_categories_production(config: od.Config) -> None:
 
     cat_1mu = config.get_category("1mu")
     cat_1mu.selection = "catid_1mu"
+
+    cat_ee = config.get_category("ee")
+    cat_ee.selection = "catid_ee"
+
+    cat_2mu = config.get_category("2mu")
+    cat_2mu.selection = "catid_2mu"
+
+    cat_emu = config.get_category("emu")
+    cat_emu.selection = "catid_emu"
+
 
     #
     # define additional 'main' categories
