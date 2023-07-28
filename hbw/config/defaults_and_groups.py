@@ -172,6 +172,9 @@ def set_config_defaults_and_groups(config_inst):
             "ggHH_kl_0_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True}, "ggHH_kl_1_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
             "ggHH_kl_2p45_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True}, "ggHH_kl_5_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True}
         },
+        "dileptest": {
+            "ggHH_kl_1_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
+        },
     }
     # when drawing DY as a line, use a different type of yellow
     config_inst.x.process_settings_groups["unstack_all"].update({"dy_lep": {"unstack": True, "color": "#e6d800"}})
