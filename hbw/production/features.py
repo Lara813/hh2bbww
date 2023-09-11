@@ -143,6 +143,7 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
         "deltaR_ll", "ll_pt", "m_bb", "deltaR_bb", "bb_pt",
         "MT", "min_dr_lljj", "delta_Phi", "m_lljjMET",
         "m_ll_check", "E_miss", "charge",
+        "lep1_pt", "lep2_pt", "hll_pt",
     },
 )
 def dl_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
@@ -163,6 +164,9 @@ def dl_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column_f32(events, "ll_pt", ll.pt)
     events = set_ak_column_f32(events, "m_ll_check", ll.mass)
     events = set_ak_column_f32(events, "deltaR_ll", deltaR_ll)
+    events = set_ak_column_f32(events, "lep1_pt", events.Lepton[:,0].pt)
+    events = set_ak_column_f32(events, "lep2_pt", events.Lepton[:,1].pt)
+    events = set_ak_column_f32(events, "hll_pt", (ll + events.MET[:]).pt)
 
     # minimum deltaR between lep and jet
     lljj_pairs = ak.cartesian([events.Lepton, events.Bjet], axis=1)

@@ -188,6 +188,12 @@ def add_feature_variables(config: od.Config) -> None:
         binning=(40, 0, 3),
         x_title=r"$ \Delta \phi(ll,jj)$",
     )
+    config.add_variable(
+        name="hll_pt",
+        binning=(40, 0., 500),
+        x_title=r"$hll \,\, p_T$",
+        unit="GeV",
+    )
 
     # FatJet features
     for i in range(2):

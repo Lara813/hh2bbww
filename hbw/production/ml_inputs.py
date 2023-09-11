@@ -180,7 +180,7 @@ def ml_inputs_init(self: Producer) -> None:
 @producer(
     uses=four_vec({"Electron", "Muon", "Bjet", "MET"}) | {
         ml_inputs,
-        # "Electron.charge", "Muon.charge",
+        "Electron.charge", "Muon.charge",
     },
     produces={
         ml_inputs,

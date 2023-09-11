@@ -13,15 +13,15 @@ import hbw.inference.constants as const  # noqa
 #
 
 # used to set default requirements for cf.CreateDatacards based on the config
-ml_model_name = "dense_default"
+dl_model_name = "dl_default"
 # default_producers = [f"ml_{ml_model_name}", "event_weights"]
 
 # All processes to be included in the final datacard
 processes = [
-    "ggHH_kl_0_kt_1_sl_hbbhww",
-    "ggHH_kl_1_kt_1_sl_hbbhww",
-    "ggHH_kl_2p45_kt_1_sl_hbbhww",
-    "ggHH_kl_5_kt_1_sl_hbbhww",
+    "ggHH_kl_0_kt_1_dl_hbbhww",
+    "ggHH_kl_1_kt_1_dl_hbbhww",
+    "ggHH_kl_2p45_kt_1_dl_hbbhww",
+    "ggHH_kl_5_kt_1_dl_hbbhww",
     "tt",
     # "ttv", "ttvv",
     "st_schannel", "st_tchannel", "st_twchannel",
@@ -35,22 +35,24 @@ processes = [
 
 # All inference channels to be included in the final datacard
 channels = [
-    "cat_1e_ggHH_kl_1_kt_1_sl_hbbhww",
-    "cat_1e_tt",
-    "cat_1e_st",
-    "cat_1e_v_lep",
-    "cat_1mu_ggHH_kl_1_kt_1_sl_hbbhww",
-    "cat_1mu_tt",
-    "cat_1mu_st",
-    "cat_1mu_v_lep",
+    "cat_2e_ggHH_kl_1_kt_1_dl_hbbhww",
+    "cat_2e_tt",
+    "cat_2e_st",
+    "cat_2e_w_lnu",
+    "cat_2e_dy_lep",
+    "cat_2mu_ggHH_kl_1_kt_1_dl_hbbhww",
+    "cat_2mu_tt",
+    "cat_2mu_st",
+    "cat_2mu_w_lnu",
+    "cat_2mu_dy_lep",
 ]
 
 rate_systematics = [
     # Lumi: should automatically choose viable uncertainties based on campaign
-    "lumi_13TeV_2016"
-    "lumi_13TeV_2017"
-    "lumi_13TeV_1718"
-    "lumi_13TeV_correlated"
+    "lumi_13TeV_2016",
+    "lumi_13TeV_2017",
+    "lumi_13TeV_1718",
+    "lumi_13TeV_correlated",
     # Rate QCDScale uncertainties
     "QCDScale_ttbar",
     "QCDScale_V",
@@ -105,7 +107,7 @@ shape_systematics = [
     "btag_lf",
     "btag_hfstats1_2017",
     "btag_hfstats2_2017"
-    "btag_lfstats1_2017"
+    "btag_lfstat1_2017"
     "btag_lfstats2_2017"
     "btag_cferr1",
     "btag_cferr2",
@@ -118,11 +120,11 @@ shape_systematics = [
 ]
 
 # All systematics to be included in the final datacard
-systematics = rate_systematics + shape_systematics
+systematics = rate_systematics #+ shape_systematics
 
 
 default_cls_dict = {
-    "ml_model_name": ml_model_name,
+    "dl_model_name": dl_model_name,
     "processes": processes,
     "channels": channels,
     "systematics": systematics,
@@ -148,13 +150,13 @@ def default(self):
     #
 
     # TODO: use ML model inst if possible
-    ml_model_processes = [
-        "ggHH_kl_1_kt_1_sl_hbbhww",
+    dl_model_processes = [
+        "ggHH_kl_1_kt_1_dl_hbbhww",
         "tt",
         "st",
-        "v_lep",
-        # "w_lnu",
-        # "dy_lep",
+        # "v_lep",
+        "w_lnu",
+        "dy_lep",
     ]
 
     # if process names need to be changed to fit some convention
@@ -164,15 +166,15 @@ def default(self):
         # "tt": "TT",
     }
 
-    for proc in ml_model_processes:
+    for proc in dl_model_processes:
         for lep in ("e", "mu"):
-            cat_name = f"cat_1{lep}_{proc}"
+            cat_name = f"cat_2{lep}_{proc}"
             if cat_name not in self.channels:
                 continue
 
             cat_kwargs = {
-                "config_category": f"1{lep}__ml_{proc}",
-                "config_variable": f"mlscore.{proc}_rebin",
+                "config_category": f"2{lep}",
+                "config_variable": f"hll_pt",
                 "mc_stats": self.mc_stats,
             }
             if self.skip_data:

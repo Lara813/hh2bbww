@@ -6,13 +6,13 @@ Collection of configurations that stay constant for the analysis
 
 # collection of all signal processes
 signals_ggHH = {
-    "ggHH_kl_0_kt_1_sl_hbbhww", "ggHH_kl_1_kt_1_sl_hbbhww",
-    "ggHH_kl_2p45_kt_1_sl_hbbhww", "ggHH_kl_5_kt_1_sl_hbbhww",
+    "ggHH_kl_0_kt_1_dl_hbbhww", "ggHH_kl_1_kt_1_dl_hbbhww",
+    "ggHH_kl_2p45_kt_1_dl_hbbhww", "ggHH_kl_5_kt_1_dl_hbbhww",
 }
 signals_qqHH = {
-    "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww", "qqHH_CV_1_C2V_1_kl_0_sl_hbbhww", "qqHH_CV_1_C2V_1_kl_2_sl_hbbhww",
-    "qqHH_CV_1_C2V_0_kl_1_sl_hbbhww", "qqHH_CV_1_C2V_2_kl_1_sl_hbbhww",
-    "qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww", "qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww",
+    "qqHH_CV_1_C2V_1_kl_1_dl_hbbhww", "qqHH_CV_1_C2V_1_kl_0_dl_hbbhww", "qqHH_CV_1_C2V_1_kl_2_dl_hbbhww",
+    "qqHH_CV_1_C2V_0_kl_1_dl_hbbhww", "qqHH_CV_1_C2V_2_kl_1_dl_hbbhww",
+    "qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww", "qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww",
 }
 signals = {*signals_ggHH, *signals_qqHH}
 
@@ -48,8 +48,8 @@ processes_per_pdf_rate = {
     # "Higgs_qg": [],  # none so far
     "Higgs_ttH": ["ttH", "tHq", "tHW"],
     # "Higgs_bbh": ["bbH"],  # removed
-    "Higgs_ggHH": signals_ggHH,
-    "Higgs_qqHH": signals_qqHH,
+    "ggHH": signals_ggHH,
+    "qqHH": signals_qqHH,
     "Higgs_VHH": ["HHZ", "HHW+", "HHW-"],
     "Higgs_ttHH": ["ttHH"],
 }

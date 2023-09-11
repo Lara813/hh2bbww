@@ -186,9 +186,9 @@ class DenseClassifier(ModelFitMixin, DenseModelMixin, MLClassifierBase):
 
 cls_dict_test = {
     "epochs": 4,
-    "processes": ["ggHH_kl_1_kt_1_sl_hbbhww", "tt", "st", "v_lep"],
+    "processes": ["ggHH_kl_1_kt_1_sl_hbbhww", "tt", "st", "dy_lep", "w_lnu"],
     "dataset_names": {
-        "ggHH_kl_1_kt_1_sl_hbbhww_powheg", "tt_dl_powheg",
+        "ggHH_kl_1_kt_1_dl_hbbhww_powheg", "tt_dl_powheg",
         "st_tchannel_t_powheg", "w_lnu_ht400To600_madgraph",
     },
 }
@@ -234,7 +234,7 @@ for dropout in (0, 0.1, 0.2, 0.3, 0.4, 0.5):
 # for testing different weights between signal and backgrounds
 for bkg_weight in (1, 2, 4, 8, 16):
     ml_process_weights = {proc_name: bkg_weight for proc_name in DenseClassifier.processes}
-    ml_process_weights["ggHH_kl_1_kt_1_sl_hbbhww"] = 1
+    ml_process_weights["ggHH_kl_1_kt_1_dl_hbbhww"] = 1
     _dnn = DenseClassifier.derive(
         f"dense_bkgw_{str(bkg_weight)}",
         cls_dict={"ml_process_weights": ml_process_weights},
