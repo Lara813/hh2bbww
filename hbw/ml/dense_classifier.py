@@ -26,16 +26,16 @@ logger = law.logger.get_logger(__name__)
 class DenseClassifier(ModelFitMixin, DenseModelMixin, MLClassifierBase):
 
     processes = [
-        "ggHH_kl_1_kt_1_sl_hbbhww",
+        "ggHH_kl_1_kt_1_dl_hbbhww",
         "tt",
         "st",
-        "v_lep",
-        # "w_lnu",
+        # "v_lep",
+        "w_lnu",
         # "dy_lep",
     ]
 
     ml_process_weights = {
-        "ggHH_kl_1_kt_1_sl_hbbhww": 1,
+        "ggHH_kl_1_kt_1_dl_hbbhww": 1,
         "tt": 2,
         "st": 2,
         "v_lep": 2,
@@ -44,7 +44,7 @@ class DenseClassifier(ModelFitMixin, DenseModelMixin, MLClassifierBase):
     }
 
     dataset_names = {
-        "ggHH_kl_1_kt_1_sl_hbbhww_powheg",
+        "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
         # TTbar
         "tt_sl_powheg",
         "tt_dl_powheg",
@@ -77,6 +77,14 @@ class DenseClassifier(ModelFitMixin, DenseModelMixin, MLClassifierBase):
     }
 
     input_features = [
+        "mli_mbb", "mli_mll", 
+        "mli_dr_bb", "mli_dr_ll", "mli_min_dr_lljj",
+        "mli_bb_pt",
+    ]
+
+
+    """
+    input_features = [
         "mli_ht", "mli_n_jet", "mli_n_deepjet",
         # "mli_deepjetsum", "mli_b_deepjetsum", "mli_l_deepjetsum",
         "mli_dr_bb", "mli_dphi_bb", "mli_mbb", "mli_mindr_lb",
@@ -93,13 +101,14 @@ class DenseClassifier(ModelFitMixin, DenseModelMixin, MLClassifierBase):
         for obj in ["fj"]
         for var in ["pt", "eta", "phi", "mass", "msoftdrop", "deepTagMD_HbbvsQCD"]
     ]
+    """
 
     store_name = "inputs_v1"
 
-    folds = 5
-    layers = (512, 512, 512)
+    folds = 2
+    layers = (64, 64, 64)
     activation = "relu"
-    learningrate = 0.00050
+    learningrate = 0.001
     batchsize = 2 ** 12
     epochs = 100
     dropout = 0.50
@@ -172,7 +181,7 @@ class DenseClassifier(ModelFitMixin, DenseModelMixin, MLClassifierBase):
 
     def training_producers(self, config_inst: od.Config, requested_producers: Sequence[str]) -> list[str]:
         # fix MLTraining Phase Space
-        return ["ml_inputs"]
+        return "ml_inputs" if self.config_inst.has_tag("is_sl") else "dl_ml_inputs"
 
 
 cls_dict_test = {

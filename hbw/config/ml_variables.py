@@ -199,6 +199,34 @@ def add_ml_variables(config: od.Config) -> None:
         log_x=True,
         x_title=r"$S_{min}$",
     )
+    config.add_variable(
+        name="mli_mll",
+        expression="mli_mll",
+        binning=(50, 1, 10000),
+        log_x=True,
+        x_title=r"$m_{ll}$",
+    )
+    config.add_variable(
+        name="mli_dr_ll",
+        expression="mli_dr_ll",
+        binning=(50, 1, 10000),
+        log_x=True,
+        x_title=r"$\Delta R_{ll}$",
+    )
+    config.add_variable(
+        name="mli_min_dr_lljj",
+        expression="mli_min_dr_lljj",
+        binning=(50, 1, 10000),
+        log_x=True,
+        x_title=r"$min \Delta R_{ll,jj}$",
+    )
+    config.add_variable(
+        name="mli_bb_pt",
+        expression="mli_bb_pt",
+        binning=(50, 1, 10000),
+        log_x=True,
+        x_title=r"$bb p_{T}$",
+    )
 
     for obj in ["b1", "b2", "j1", "j2", "lep", "met"]:
         for var in ["pt", "eta"]:

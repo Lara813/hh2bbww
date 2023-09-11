@@ -170,12 +170,83 @@ def ml_inputs_init(self: Producer) -> None:
     )
     self.produces |= self.ml_columns
 
-    if self.config_inst.x("add_categories_production", True):
-        # add categories but only on first call
-        add_categories_production(self.config_inst)
-        self.config_inst.x.add_categories_production = False
+    # add categories to config
+    add_categories_production(self.config_inst)
 
-    if self.config_inst.x("add_ml_variables", True):
-        # add variable instances to config
-        add_ml_variables(self.config_inst)
-        self.config_inst.x.add_ml_variables = False
+    # add variable instances to config
+    add_ml_variables(self.config_inst) 
+
+
+@producer(
+    uses=four_vec({"Electron", "Muon", "Bjet", "MET"}) | {
+        ml_inputs,
+        # "Electron.charge", "Muon.charge",
+    },
+    produces={
+        ml_inputs,
+        "mli_dr_ll", "mli_mll", "mli_min_dr_lljj", "mli_bb_pt",
+        # "deltaR_ll", "ll_pt", "m_bb", "deltaR_bb", "bb_pt",
+        # "MT", "min_dr_lljj", "delta_Phi", "m_lljjMET",
+        # "m_ll_check", "E_miss", "charge", "wp_score",
+    },
+)
+def dl_ml_inputs(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
+
+    # Inherit common features and prepares Object Lepton. Bjet, etc.
+    events = self[ml_inputs](events, **kwargs)
+
+    # create ll object and ll variables
+    ll = (events.Lepton[:, 0] + events.Lepton[:, 1])
+    deltaR_ll = events.Lepton[:, 0].delta_r(events.Lepton[:, 1])
+    # events = set_ak_column_f32(events, "ll_pt", ll.pt)
+    # events = set_ak_column_f32(events, "m_ll_check", ll.mass)
+    events = set_ak_column_f32(events, "mli_dr_ll", deltaR_ll)
+    events = set_ak_column_f32(events, "mli_mll", ll.mass)
+
+    # minimum deltaR between lep and jet
+    lljj_pairs = ak.cartesian([events.Lepton, events.Bjet], axis=1)
+    lep, jet = ak.unzip(lljj_pairs)
+    min_dr_lljj = (ak.min(lep.delta_r(jet), axis=-1))
+    events = set_ak_column_f32(events, "mli_min_dr_lljj", min_dr_lljj)
+
+    # Transverse mass
+    MT = (2 * events.MET.pt * ll.pt * (1 - np.cos(ll.delta_phi(events.MET)))) ** 0.5
+    # events = set_ak_column_f32(events, "MT", MT)
+
+    # delta Phi between ll and bb object
+    bb = (events.Bjet[:, 0] + events.Bjet[:, 1])
+    # events = set_ak_column_f32(events, "delta_Phi", abs(ll.delta_phi(bb)))
+    events = set_ak_column_f32(events, "mli_bb_pt", bb.pt)
+
+    # invariant mass of all decay products
+    m_lljjMET = (events.Bjet[:, 0] + events.Bjet[:, 1] + events.Lepton[:, 0] + events.Lepton[:, 1] + events.MET[:]).mass
+    # events = set_ak_column(events, "m_lljjMET", m_lljjMET)
+
+    # Lepton charge
+    # events = set_ak_column(events, "charge", (events.Lepton.charge))
+
+    # fill none values for dl variables
+    dl_variable_list = [
+        "mli_bb_pt", "mli_dr_bb", "mli_min_dr_lljj", "mli_mll",
+        # "charge", "MT", "delta_Phi", "E_miss", "m_lljjMET",
+    ]
+    for var in dl_variable_list:
+        events = set_ak_column_f32(events, var, ak.fill_none(events[var], EMPTY_FLOAT))
+
+    return events
+
+
+@dl_ml_inputs.init
+def dl_ml_inputs_init(self: Producer) -> None:
+    # add variable instances to config
+    # define ML input separately to self.produces
+    self.ml_columns = {
+        "mli_dr_ll", "mli_mll", "mli_min_dr_lljj", "mli_bb_pt",
+    } 
+    self.produces |= self.ml_columns
+
+    # add categories to config
+    add_categories_production(self.config_inst)
+
+    # add variable instances to config
+    add_ml_variables(self.config_inst) 

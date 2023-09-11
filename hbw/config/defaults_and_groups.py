@@ -47,7 +47,11 @@ def default_producers(cls, container, task_params):
     # per default, use the ml_inputs and event_weights
     # TODO: we might need two ml_inputs producers in the future (sl vs dl)
     default_producers = ["ml_inputs"]
-    if task_params["dataset_inst"].is_mc:
+    if container.has_tag("is_sl"):
+        default_producers = "ml_inputs"
+    elif container.has_tag("is_dl"):
+        default_producers = "dl_ml_inputs"
+    if dataset_inst and dataset_inst.is_mc:
         # run event weights producer only if it's a MC dataset
         default_producers.append("event_weights")
 
