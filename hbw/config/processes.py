@@ -116,10 +116,10 @@ def configure_hbw_processes(config: od.Config):
         # NOTE: only built for run 2 because kl variations are missing in run 3
         signal_processes = [
             config.get_process(f"ggHH_kl_{kl}_kt_1_dl_hbbhww")
-            for kl in [0, 1, "2p45"]
+            for kl in [0, 1, "2p45","5"]
         ]
-        sig = config.add_process(
-            name="sig",
+        ggHH_sig_all = config.add_process(
+            name="ggHH_sig_all",
             id=75835213,  # random number
             xsecs={
                 13: sum([proc.get_xsec(13) for proc in signal_processes]),

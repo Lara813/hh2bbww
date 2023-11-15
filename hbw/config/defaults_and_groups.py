@@ -157,7 +157,7 @@ def set_config_defaults_and_groups(config_inst):
         "qcd": ["qcd_*"], "qcd_mu": ["qcd_mu*"], "qcd_ele": ["qcd_em*", "qcd_bctoe*"],
         "signal": ["ggHH_*", "qqHH_*"], "gghh": ["ggHH_*"], "qqhh": ["qqHH_*"],
         "ml": ["ggHH_kl_1*", "tt_*", "st_*", "dy_*", "w_lnu_*"],
-        "dilep": ["tt_*", "st_*", "dy_*", "w_lnu_*", "ggHH_*"],
+        "dilep": ["tt_*", "st_*", "dy_*", "ggHH_*", "w_lnu_*"],
     }
 
     # category groups for conveniently looping over certain categories
@@ -225,7 +225,7 @@ def set_config_defaults_and_groups(config_inst):
         "dilep": [
             "n_jet", "n_muon", "n_electron", "ht", "m_bb", "m_ll", "deltaR_bb", "deltaR_ll",
             "ll_pt", "bb_pt", "E_miss", "delta_Phi", "MT", "min_dr_lljj",
-            "m_lljjMET", "channel_id", "n_bjet", "wp_score", "charge", "m_ll_check",
+            "m_lljjMET", "channel_id", "n_bjet", "wp_score", "m_ll_check",
         ],
         "control": [
             "n_jet", "n_fatjet", "n_electron", "n_muon",

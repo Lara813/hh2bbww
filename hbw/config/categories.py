@@ -33,6 +33,20 @@ import order as od
 
 logger = law.logger.get_logger(__name__)
 
+def name_fn(root_cats):
+    cat_name = "__".join(cat.name for cat in root_cats.values())
+    return cat_name
+
+
+def kwargs_fn(root_cats):
+    kwargs = {
+        "id": sum([c.id for c in root_cats.values()]),
+        "label": ", ".join([c.name for c in root_cats.values()]),
+        "aux": {
+            "root_cats": {key: value.name for key, value in root_cats.items()},
+        },
+    }
+    return kwargs
 
 @call_once_on_config()
 def add_gen_categories(config: od.Config) -> None:
@@ -194,21 +208,6 @@ def add_categories_selection(config: od.Config) -> None:
     add_lepton_categories(config)
 
 
-def name_fn(root_cats):
-    cat_name = "__".join(cat.name for cat in root_cats.values())
-    return cat_name
-
-
-def kwargs_fn(root_cats):
-    kwargs = {
-        "id": sum([c.id for c in root_cats.values()]),
-        "label": ", ".join([c.name for c in root_cats.values()]),
-        "aux": {
-            "root_cats": {key: value.name for key, value in root_cats.items()},
-        },
-    }
-    return kwargs
-
 
 @call_once_on_config()
 def add_categories_production(config: od.Config) -> None:
@@ -318,7 +317,7 @@ def add_categories_ml(config, ml_model_inst):
         "lepid": [config.get_category("sr"), config.get_category("fake")],
         # "met": [config.get_category("highmet"), config.get_category("lowmet")],
         "lep": [config.get_category(lep_ch) for lep_ch in config.x.lepton_channels],
-        "jet": [config.get_category("resolved"), config.get_category("boosted")],
+        # "jet": [config.get_category("resolved"), config.get_category("boosted")],
         "b": [config.get_category("1b"), config.get_category("2b")],
         "dnn": ml_categories,
     })
