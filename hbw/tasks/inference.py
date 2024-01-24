@@ -356,6 +356,7 @@ class ModifyDatacardsFlatRebin(
                     raise Exception(f"{h} is not a TH1 histogram")
 
                 h_rebin = apply_binning(h, rebin_values)
+                # h_rebin.Scale((36310+41480+59830)/41480)
                 problematic_bin_count = check_empty_bins(h_rebin)  # noqa
                 logger.info(f"Inserting histogram with name {key}")
                 out_file[key] = uproot.from_pyroot(h_rebin)

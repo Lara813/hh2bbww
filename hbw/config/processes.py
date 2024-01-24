@@ -124,7 +124,7 @@ def configure_hbw_processes(config: od.Config):
             xsecs={
                 13: sum([proc.get_xsec(13) for proc in signal_processes]),
             },
-            label="signal",
+            label="signal (kl=0,1,2p45)",
         )
         for proc in signal_processes:
             try:
