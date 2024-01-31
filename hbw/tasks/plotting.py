@@ -303,6 +303,127 @@ class PlotPostfitShapes(
 
     @view_output_plots
     def run(self):
+        pass
+
+
+def load_hists_uproot(fit_diagnostics_path):
+    """ Helper to load histograms from a fit_diagnostics file """
+    # prepare output dict
+    hists = DotDict()
+    with uproot.open(fit_diagnostics_path) as tfile:
+        keys = [key.split("/") for key in tfile.keys()]
+        for key in keys:
+            if len(key) != 3:
+                continue
+
+            # get the histogram from the tfile
+            h_in = tfile["/".join(key)]
+
+            # unpack key
+            fit, channel, process = key
+            process = process.split(";")[0]
+
+            if "data" not in process:
+                # transform TH1F to hist
+                h_in = h_in.to_hist()
+
+            # set the histogram in a deep dictionary
+            hists = law.util.merge_dicts(hists, DotDict.wrap({fit: {channel: {process: h_in}}}), deep=True)
+
+    return hists
+
+
+# imports regarding plot function
+mpl = maybe_import("matplotlib")
+plt = maybe_import("matplotlib.pyplot")
+mplhep = maybe_import("mplhep")
+
+from columnflow.plotting.plot_all import plot_all
+from columnflow.plotting.plot_util import (
+    prepare_plot_config,
+    prepare_style_config,
+)
+
+
+def plot_postfit_shapes(
+    hists: OrderedDict,
+    config_inst: od.Config,
+    category_inst: od.Category,
+    variable_insts: list[od.Variable],
+    style_config: dict | None = None,
+    density: bool | None = False,
+    shape_norm: bool | None = False,
+    yscale: str | None = "",
+    hide_errors: bool | None = None,
+    process_settings: dict | None = None,
+    variable_settings: dict | None = None,
+    **kwargs,
+) -> tuple(plt.Figure, tuple(plt.Axes)):
+    variable_inst = law.util.make_tuple(variable_insts)[0]
+
+    plot_config = prepare_plot_config(
+        hists,
+        shape_norm=shape_norm,
+        hide_errors=hide_errors,
+    )
+
+    default_style_config = prepare_style_config(
+        config_inst, category_inst, variable_inst, density, shape_norm, yscale,
+    )
+    default_style_config["ax_cfg"].pop("xlim")
+
+    style_config = law.util.merge_dicts(default_style_config, style_config, deep=True)
+    if shape_norm:
+        style_config["ax_cfg"]["ylabel"] = r"$\Delta N/N$"
+
+    return plot_all(plot_config, style_config, **kwargs)
+
+
+class PlotPostfitShapes(
+    HBWTask,
+    PlotBase1D,
+    # to correctly setup our InferenceModel, we need all these mixins, but hopefully, all these
+    # parameters are automatically resolved correctly
+    InferenceModelMixin,
+    MLModelsMixin,
+    ProducersMixin,
+    SelectorStepsMixin,
+    CalibratorsMixin,
+):
+    """
+    Task that creates Postfit shape plots based on a fit_diagnostics file.
+
+    Work in Progress!
+    TODO:
+    - include data
+    - include correct uncertainty bands
+    - pass correct binning information
+    """
+
+    sandbox = dev_sandbox(law.config.get("analysis", "default_columnar_sandbox"))
+
+    plot_function = PlotBase.plot_function.copy(
+        default="hbw.tasks.plotting.plot_postfit_shapes",
+        add_default_to_description=True,
+    )
+
+    fit_diagnostics_file = luigi.Parameter(
+        default=law.NO_STR,
+        description="fit_diagnostics file that is used to load histograms",
+    )
+
+    prefit = luigi.BoolParameter(
+        default=False,
+        description="Whether to do prefit or postfit plots; defaults to False",
+    )
+
+    def requires(self):
+        return {}
+
+    def output(self):
+        return {"plots": self.target("plots", dir=True)}
+
+    def run(self):
         logger.warning(
             f"Note! It is important that the requested inference_model {self.inference_model} "
             "is identical to the one that has been used to create the datacards",
