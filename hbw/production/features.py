@@ -24,7 +24,6 @@ maybe_import("coffea.nanoevents.methods.nanoaod")
 # helper
 set_ak_column_f32 = functools.partial(set_ak_column, value_type=np.float32)
 
-
 @producer(
     uses=four_vec("Jet"),
     produces={"m_jj", "jj_pt", "deltaR_jj"},
@@ -44,13 +43,15 @@ def jj_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
 
 
 @producer(
-    uses={
-        "HbbJet.msoftdrop",
-    } | four_vec("Bjet"),
-    produces={"m_bb", "bb_pt", "deltaR_bb", "m_bb_combined"},
+    uses=
+        #"HbbJet.msoftdrop",
+     four_vec("Bjet"),
+    produces={"m_bb", "bb_pt", "deltaR_bb"},#, "m_bb_combined"},
 )
 def bb_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
+    events = set_ak_column(events, "Bjet", ak.pad_none(events.Bjet, 2))
     # create bb features
+    
     bb = (events.Bjet[:, 0] + events.Bjet[:, 1])
     events = set_ak_column_f32(events, "m_bb", bb.mass)
     events = set_ak_column_f32(events, "bb_pt", bb.pt)
@@ -59,8 +60,8 @@ def bb_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column_f32(events, "deltaR_bb", deltaR_bb)
 
     # combination of resolved and boosted bb mass
-    m_bb_combined = ak.where(ak.num(events.HbbJet) > 0, events.HbbJet[:, 0].msoftdrop, bb.mass)
-    events = set_ak_column_f32(events, "m_bb_combined", m_bb_combined)
+    # m_bb_combined = ak.where(ak.num(events.HbbJet) > 0, events.HbbJet[:, 0].msoftdrop, bb.mass)
+    #cevents = set_ak_column_f32(events, "m_bb_combined", m_bb_combined)
 
     # fill none values
     for col in self.produces:
@@ -92,14 +93,14 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = self[prepare_objects](events, **kwargs)
 
     # object padding
-    events = set_ak_column(events, "Jet", ak.pad_none(events.Jet, 2))
+    #events = set_ak_column(events, "Jet", ak.pad_none(events.Jet, 2))
     events = set_ak_column(events, "Bjet", ak.pad_none(events.Bjet, 2))
-    events = set_ak_column(events, "FatJet", ak.pad_none(events.FatJet, 1))
-    events = set_ak_column(events, "HbbJet", ak.pad_none(events.HbbJet, 1))
+    #events = set_ak_column(events, "FatJet", ak.pad_none(events.FatJet, 1))
+    #events = set_ak_column(events, "HbbJet", ak.pad_none(events.HbbJet, 1))
 
     # ht and number of objects (safe for None entries)
-    events = set_ak_column_f32(events, "ht", ak.sum(events.Jet.pt, axis=1))
-    events = set_ak_column(events, "n_jet", ak.sum(events.Jet.pt > 0, axis=1))
+    #events = set_ak_column_f32(events, "ht", ak.sum(events.Jet.pt, axis=1))
+    #events = set_ak_column(events, "n_jet", ak.sum(events.Jet.pt > 0, axis=1))
     events = set_ak_column(events, "n_bjet", ak.sum(events.Bjet.pt > 0, axis=1))
     events = set_ak_column(events, "n_electron", ak.sum(events.Electron.pt > 0, axis=1))
     events = set_ak_column(events, "n_muon", ak.sum(events.Muon.pt > 0, axis=1))
@@ -111,14 +112,14 @@ def features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column(events, "n_hbbjet", ak.sum(events.HbbJet.pt > 0, axis=1))
 
     # Subjettiness
-    events = set_ak_column_f32(events, "FatJet.tau21", events.FatJet.tau2 / events.FatJet.tau1)
+    # events = set_ak_column_f32(events, "FatJet.tau21", events.FatJet.tau2 / events.FatJet.tau1)
 
     # bb and jj features
     events = self[bb_features](events, **kwargs)
-    events = self[jj_features](events, **kwargs)
+    # events = self[jj_features](events, **kwargs)
 
     # undo object padding (remove None entries)
-    for obj in ["Jet", "Bjet", "FatJet"]:
+    for obj in ["Bjet"]: #, "Bjet"]:#, "FatJet"]:
         events = set_ak_column(events, obj, events[obj][~ak.is_none(events[obj], axis=1)])
 
     return events
@@ -138,17 +139,16 @@ def features_init(self: Producer) -> None:
     produces={
         features,
         "deltaR_ll", "ll_pt", "m_bb", "deltaR_bb", "bb_pt",
-        "MT", "min_dr_lljj", "delta_Phi", "m_lljjMET",
-        "m_ll_check", "E_miss", "charge", "wp_score", "E_miss", "wp_score",
+        "MT", "min_dr_lljj", "m_lljjMET", # "delta_Phi", "E_miss",
+        "m_ll_check", "charge", #"wp_score",
     },
 )
 def dl_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
 
     # Inherit common features and prepares Object Lepton. Bjet, etc.
     events = self[features](events, **kwargs)
-    events = set_ak_column(events, "Bjet", ak.pad_none(events.Bjet, 2))
-    events = set_ak_column_f32(events, "wp_score", events.Bjet.btagDeepFlavB)
 
+    events = set_ak_column(events, "Bjet", ak.pad_none(events.Bjet, 2))
     # create ll object and ll variables
     ll = (events.Lepton[:, 0] + events.Lepton[:, 1])
     deltaR_ll = events.Lepton[:, 0].delta_r(events.Lepton[:, 1])
@@ -165,11 +165,11 @@ def dl_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     # Transverse mass
     MT = (2 * events.MET.pt * ll.pt * (1 - np.cos(ll.delta_phi(events.MET)))) ** 0.5
     events = set_ak_column_f32(events, "MT", MT)
-    events = set_ak_column_f32(events, "E_miss", events.MET.pt)
 
+    # __import__("IPython").embed()
     # delta Phi between ll and bb object
-    bb = (events.Bjet[:, 0] + events.Bjet[:, 1])
-    events = set_ak_column_f32(events, "delta_Phi", abs(ll.delta_phi(bb)))
+    #bb = (events.Bjet[:, 0] + events.Bjet[:, 1])
+    #events = set_ak_column_f32(events, "delta_Phi", abs(ll.delta_phi(bb)))
 
     # invariant mass of all decay products
     m_lljjMET = (events.Bjet[:, 0] + events.Bjet[:, 1] + events.Lepton[:, 0] + events.Lepton[:, 1] + events.MET[:]).mass
@@ -181,13 +181,10 @@ def dl_features(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     # fill none values for dl variables
     dl_variable_list = [
         "m_bb", "bb_pt", "deltaR_bb", "ll_pt", "m_ll_check", "deltaR_ll", "min_dr_lljj",
-        "charge", "MT", "delta_Phi", "E_miss", "m_lljjMET",
+        "charge", "MT", "m_lljjMET", #"delta_Phi","E_miss",
     ]
     for var in dl_variable_list:
         events = set_ak_column_f32(events, var, ak.fill_none(events[var], EMPTY_FLOAT))
-
-    for obj in ["Bjet"]:
-        events = set_ak_column(events, obj, events[obj][~ak.is_none(events[obj], axis=1)])
 
     return events
 
