@@ -6,13 +6,118 @@ Collection of helpers
 
 from __future__ import annotations
 
-from typing import Hashable, Iterable
 
+import time
+from typing import Hashable, Iterable, Callable
+from functools import wraps
 import tracemalloc
 
 import law
 
+from columnflow.util import maybe_import
+
+np = maybe_import("numpy")
+
 _logger = law.logger.get_logger(__name__)
+
+
+def print_law_config(sections: list | None = None, keys: list | None = None):
+    """ Helper to print the currently used law config """
+    law_sections = law.config.sections()
+    for section in sections:
+        if section not in law_sections:
+            continue
+        print(f"{'=' * 20} [{section}] {'=' * 20}")
+        section_keys = law.config.options(section)
+        for key in section_keys:
+            if key in keys:
+                value = law.config.get_expanded(section, key)
+                print(f"{key}: {value}")
+
+
+def get_subclasses_deep(*classes):
+    """
+    Helper that gets all subclasses from input classes based on the '_subclasses' attribute.
+    """
+    classes = {_cls.__name__: _cls for _cls in classes}
+    all_classes = {}
+
+    while classes:
+        for key, _cls in classes.copy().items():
+            classes.update(getattr(_cls, "_subclasses", {}))
+            all_classes[key] = classes.pop(key)
+
+    return all_classes
+
+
+def build_param_product(params: dict[str, list], output_keys: Callable = lambda i: i):
+    """
+    Helper that builds the product of all *param* values and returns a dictionary of
+    all the resulting parameter combinations.
+
+    Example:
+
+    .. code-block:: python
+        build_param_product({"A": ["a", "b"], "B": [1, 2]})
+        # -> {
+            0: {"A": "a", "B": 1},
+            1: {"A": "a", "B": 2},
+            2: {"A": "b", "B": 1},
+            3: {"A": "b", "B": 2},
+        }
+    """
+    from itertools import product
+    param_product = {}
+    keys, values = zip(*params.items())
+    for i, bundle in enumerate(product(*values)):
+        d = dict(zip(keys, bundle))
+        param_product[output_keys(i)] = d
+
+    return param_product
+
+
+def round_sig(
+    value: int | float | np.number,
+    sig: int = 4,
+    convert: Callable | None = None,
+) -> int | float | np.number:
+    """
+    Helper function to round number *value* on *sig* significant digits and
+    optionally transform output to type *convert*
+    """
+    if not np.isfinite(value):
+        # cannot round infinite
+        _logger.warning("cannot round infinite number")
+        return value
+
+    from math import floor, log10
+
+    def try_rounding(_value):
+        try:
+            n_digits = sig - int(floor(log10(abs(_value)))) - 1
+            if convert in (int, np.int8, np.int16, np.int32, np.int64):
+                # do not round on decimals when converting to integer
+                n_digits = min(n_digits, 0)
+            return round(_value, n_digits)
+        except Exception:
+            _logger.warning(f"Cannot round number {value} to {sig} significant digits. Number will not be rounded")
+            return value
+
+    # round first to not lose information from type conversion
+    rounded_value = try_rounding(value)
+
+    # convert number if "convert" is given
+    if convert not in (None, False):
+        try:
+            rounded_value = convert(rounded_value)
+        except Exception:
+            _logger.warning(f"Cannot convert {rounded_value} to {convert.__name__}")
+            return rounded_value
+
+        # some types need rounding again after converting (e.g. np.float32 to float)
+        rounded_value = try_rounding(rounded_value)
+
+    return rounded_value
 
 
 def log_memory(
@@ -137,6 +242,7 @@ def call_once_on_config(include_hash=False):
     Parametrized decorator to ensure that function *func* is only called once for the config *config*
     """
     def outer(func):
+        @wraps(func)
         def inner(config, *args, **kwargs):
             tag = f"{func.__name__}_called"
             if include_hash:
@@ -149,3 +255,31 @@ def call_once_on_config(include_hash=False):
             return func(config, *args, **kwargs)
         return inner
     return outer
+
+
+def timeit(func):
+    """ Simple wrapper to measure execution time of a function """
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        _logger.info(f"Function {func.__name__}{args} {kwargs} Took {total_time:.4f} seconds")
+        return result
+    return timeit_wrapper
+
+
+def timeit_multiple(func):
+    """ Wrapper to measure the number of execution calls and the added execution time of a function """
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        func.total_calls = getattr(func, "total_calls", 0) + 1
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        func.total_time = getattr(func, "total_time", 0) + total_time
+        _logger.info(f"{func.__name__} has been run {func.total_calls} times ({func.total_time:.4f} seconds)")
+        return result
+    return timeit_wrapper

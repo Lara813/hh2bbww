@@ -6,6 +6,7 @@ First implementation of DNN for HH analysis, generalized (TODO)
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from typing import Any
 import gc
 import time
@@ -17,13 +18,12 @@ import order as od
 from columnflow.ml import MLModel
 from columnflow.util import maybe_import, dev_sandbox, DotDict
 from columnflow.columnar_util import Route, set_ak_column, remove_ak_column
-from columnflow.tasks.selection import MergeSelectionStatsWrapper
 
 from hbw.util import log_memory
 from hbw.ml.helper import assign_dataset_to_process, predict_numpy_on_batch
 from hbw.ml.plotting import (
-    plot_history, plot_confusion, plot_roc_ovr, plot_roc_ovo, plot_output_nodes,
-    get_input_weights,
+    plot_history, plot_confusion, plot_roc_ovr,  # plot_roc_ovo,
+    plot_output_nodes, get_input_weights,
 )
 
 
@@ -43,19 +43,21 @@ class MLClassifierBase(MLModel):
     """
 
     # set some defaults, can be overwritten by subclasses or via cls_dict
-    processes = ["tt", "st"]
-    dataset_names = {"tt_sl_powheg", "tt_dl_powheg", "st_tchannel_t_powheg"}
-    input_features = ["mli_ht", "mli_n_jet"]
-    validation_fraction = 0.20  # percentage of the non-test events
-    store_name = "inputs_base"
-    ml_process_weights = {"st": 2, "tt": 1}
-    negative_weights = "handle"
-    epochs = 50
-    batchsize = 2 ** 10
-    folds = 5
+    processes: list = ["tt", "st"]
+    dataset_names: set = {"tt_sl_powheg", "tt_dl_powheg", "st_tchannel_t_powheg"}
+    input_features: list = ["mli_ht", "mli_n_jet"]
+    validation_fraction: float = 0.20  # percentage of the non-test events
+    store_name: str = "inputs_base"
+    ml_process_weights: dict = {"st": 2, "tt": 1}
+    negative_weights: str = "handle"
+    epochs: int = 50
+    batchsize: int = 2 ** 10
+    folds: int = 5
+
+    dump_arrays: bool = False
 
     # parameters to add into the `parameters` attribute and store in a yaml file
-    bookkeep_params = [
+    bookkeep_params: int = [
         "processes", "dataset_names", "input_features", "validation_fraction", "ml_process_weights",
         "negative_weights", "epochs", "batchsize", "folds",
     ]
@@ -87,26 +89,27 @@ class MLClassifierBase(MLModel):
                     x_title=f"DNN output score {self.config_inst.get_process(proc).x.ml_label}",
                 )
 
+    def preparation_producer(self: MLModel, config_inst: od.Config):
+        """ producer that is run as part of PrepareMLEvents and MLEvaluation (before `evaluate`) """
+        return "ml_preparation"
+
     def requires(self, task: law.Task) -> str:
-        # TODO: either remove or include some MLStats task
-        # add selection stats to requires; NOTE: not really used at the moment
-        return MergeSelectionStatsWrapper.req(
-            task,
-            shifts="nominal",
-            configs=self.config_inst.name,
-            datasets=self.dataset_names,
-        )
+        # Custom requirements (none currently)
+        return {}
 
     def sandbox(self, task: law.Task) -> str:
-        # venv_ml_tf sandbox but with scikit-learn and restrictet to tf 2.11.0
+        # venv_ml_tf sandbox but with scikit-learn and restricted to tf 2.11.0
         return dev_sandbox("bash::$HBW_BASE/sandboxes/venv_ml_plotting.sh")
-        # return dev_sandbox("bash::$CF_BASE/sandboxes/venv_ml_tf.sh")
 
     def datasets(self, config_inst: od.Config) -> set[od.Dataset]:
         return {config_inst.get_dataset(dataset_name) for dataset_name in self.dataset_names}
 
     def uses(self, config_inst: od.Config) -> set[Route | str]:
-        return set(self.input_features) | {"normalization_weight"}
+        columns = set(self.input_features) | {"normalization_weight"}
+        # if self.dataset_inst.is_mc:
+        # TODO: switch to full event weight
+        # ccolumns.add("normalization_weight")
+        return columns
 
     def produces(self, config_inst: od.Config) -> set[Route | str]:
         produced = set()
@@ -122,11 +125,10 @@ class MLClassifierBase(MLModel):
 
         outp = {
             "mlmodel": target,
-            # NOTE: do we want to keep plots in a nested directory or in a sibling directory?
+            "checkpoint": target.child("checkpoint", type="d", optional=True),
             "plots": target.child("plots", type="d", optional=True),
-            # "plots": target.sibling(f"plots_f{task.branch}of{self.folds}", type="d", optional=True),
-            # TODO: fill the stats.yaml with scores like accuracy, AUC, etc.
-            # "stats": target.child("stats.yaml", type="f", optional=True),
+            "stats": target.child("stats.yaml", type="f", optional=True),
+            "arrays": target.child("arrays", type="d", optional=True),
         }
 
         # define all files that need to be present
@@ -137,8 +139,10 @@ class MLClassifierBase(MLModel):
 
         return outp
 
-    def open_model(self, target: law.LocalDirectoryTarget) -> tf.keras.models.Model:
-        input_features = tuple(target["mlmodel"].child(
+    def open_model(self, target: law.LocalDirectoryTarget) -> dict[str, Any]:
+        models = {}
+
+        models["input_features"] = tuple(target["mlmodel"].child(
             "input_features.pkl", type="f",
         ).load(formatter="pickle"))
 
@@ -146,21 +150,24 @@ class MLClassifierBase(MLModel):
         #       should check that this also works when running remote
         with open(target["mlmodel"].child("parameters.yaml", type="f").fn) as f:
             f_in = f.read()
-        parameters = yaml.load(f_in, Loader=yaml.Loader)
+        models["parameters"] = yaml.load(f_in, Loader=yaml.Loader)
 
         # custom loss needed due to output layer changes for negative weights
         from hbw.ml.tf_util import cumulated_crossentropy
-        model = tf.keras.models.load_model(
+        models["model"] = tf.keras.models.load_model(
             target["mlmodel"].path, custom_objects={cumulated_crossentropy.__name__: cumulated_crossentropy},
         )
-        return model, input_features, parameters
+        models["best_model"] = tf.keras.models.load_model(
+            target["checkpoint"].path, custom_objects={cumulated_crossentropy.__name__: cumulated_crossentropy},
+        )
+
+        return models
 
     def prepare_inputs(
         self,
         task,
         input,
         output: law.LocalDirectoryTarget,
-        per_process: bool = True,
     ) -> dict[str, np.array]:
         # get process instances and assign relevant information to the process_insts
         # from the first config_inst (NOTE: this assumes that all config_insts use the same processes)
@@ -192,7 +199,7 @@ class MLClassifierBase(MLModel):
 
                 # calculate some stats per dataset
                 filenames = [inp["mlevents"].path for inp in files]
-                
+
                 N_events = sum([len(ak.from_parquet(fn)) for fn in filenames])
                 if N_events == 0:
                     # skip empty datasets
@@ -203,11 +210,29 @@ class MLClassifierBase(MLModel):
                 sum_weights = sum([ak.sum(w) for w in weights])
                 sum_abs_weights = sum([ak.sum(np.abs(w)) for w in weights])
                 sum_pos_weights = sum([ak.sum(w[w > 0]) for w in weights])
+                
+                proc_sig = dataset_inst.processes.get_first()
+                if "kl_1" in proc_sig.name:  
+                    sum_weights_1 = sum_abs_weights #/proc_sig.get_xsec(self.config_inst.campaign.ecm).nominal
+                    proc_inst.x.sum_weights_1 = proc_inst.x("sum_weights_1", 0) + sum_weights_1
+                    proc_inst.x.N_events_1 = proc_inst.x("N_events_1", 0) + N_events
+                elif "kl_0" in proc_sig.name: 
+                    sum_weights_0 = sum_abs_weights #/proc_sig.get_xsec(self.config_inst.campaign.ecm).nominal
+                    proc_inst.x.sum_weights_0 = proc_inst.x("sum_weights_0", 0) + sum_weights_0
+                    proc_inst.x.N_events_0 = proc_inst.x("N_events_0", 0) + N_events
+                elif "kl_2p45" in proc_sig.name: 
+                    sum_weights_2p45 = sum_abs_weights #/proc_sig.get_xsec(self.config_inst.campaign.ecm).nominal
+                    proc_inst.x.sum_weights_2p45 = proc_inst.x("sum_weights_2p45", 0) + sum_weights_2p45
+                    proc_inst.x.N_events_2p45 = proc_inst.x("N_events_2p45", 0) + N_events
+                elif "kl_5" in proc_sig.name: 
+                    sum_weights_5 = sum_abs_weights #/proc_sig.get_xsec(self.config_inst.campaign.ecm).nominal
+                    proc_inst.x.sum_weights_5 = proc_inst.x("sum_weights_5", 0) + sum_weights_5
+                    proc_inst.x.N_events_5 = proc_inst.x("N_events_5", 0) + N_events
 
                 # bookkeep filenames and stats per process
                 proc_inst.x.filenames = proc_inst.x("filenames", []) + filenames
                 proc_inst.x.N_events = proc_inst.x("N_events", 0) + N_events
-                proc_inst.x.sum_weights = proc_inst.x("sum_weights", 0) + sum_weights
+                proc_inst.x.sum_weights = proc_inst.x("sum_weights", 0) + sum_weights    
                 proc_inst.x.sum_abs_weights = proc_inst.x("sum_abs_weights", 0) + sum_abs_weights
                 proc_inst.x.sum_pos_weights = proc_inst.x("sum_pos_weights", 0) + sum_pos_weights
 
@@ -240,11 +265,13 @@ class MLClassifierBase(MLModel):
             t0 = time.perf_counter()
             for fn in proc_inst.x.filenames:
                 events = ak.from_parquet(fn)
-
+                if len(events) == 0:
+                    logger.warning("File {fn} of process {proc_inst.name} is empty and will be skipped")
+                    continue
                 # check that all relevant input features are present
                 if not set(self.input_features).issubset(set(events.fields)):
                     raise Exception(
-                        f"The columns {set(events.fields).difference(set(self.input_features))} "
+                        f"The columns {set(self.input_features).difference(events.fields)} "
                         "are not present in the ML input events",
                     )
 
@@ -254,8 +281,44 @@ class MLClassifierBase(MLModel):
                 target[:, proc_inst.x.ml_id] = 1
 
                 # event weights, normalized to the sum of events per process
-                weights = ak.to_numpy(events.normalization_weight).astype(np.float32)
-                ml_weights = weights / proc_inst.x.sum_abs_weights * proc_inst.x.N_events
+                weights = ak.to_numpy(events.normalization_weight).astype(np.float32) # /proc_inst.get_xsec(self.config_inst.campaign.ecm).nominal
+                # __import__("IPython").embed()
+                ref_ml_weights = weights / proc_inst.x.sum_abs_weights * proc_inst.x.N_events
+                if "kl_1" in fn:
+                    ml_weights = weights / proc_inst.x.sum_weights_1 * proc_inst.x.N_events_1
+                    logger.info(
+                        f"#####################################################################"
+                        f"------------ weights applied on file kl_1"
+                        f"ml_weights applied {ml_weights[0]} {chr(10)}"
+                        f"ml_weights reference applied before {ref_ml_weights[0]} {chr(10)}",
+                    )
+                elif "kl_0" in fn: 
+                    ml_weights = weights / proc_inst.x.sum_weights_0 * proc_inst.x.N_events_0
+                    logger.info(
+                        f"#####################################################################"
+                        f"------------ weights applied on file kl_0"
+                        f"ml_weights applied {ml_weights[0]} {chr(10)}"
+                        f"ml_weights reference applied before {ref_ml_weights[0]} {chr(10)}",
+                    )
+                elif "kl_2p45" in fn: 
+                    ml_weights = weights / proc_inst.x.sum_weights_2p45 * proc_inst.x.N_events_2p45
+                    logger.info(
+                        f"#####################################################################"
+                        f"------------ weights applied on file kl_2p45"
+                        f"ml_weights applied {ml_weights[0]} {chr(10)}"
+                        f"ml_weights reference applied before {ref_ml_weights[0]} {chr(10)}",
+                    )
+                elif "kl_5" in fn: 
+                    ml_weights = weights / proc_inst.x.sum_weights_5 * proc_inst.x.N_events_5
+                    logger.info(
+                        f"#####################################################################"
+                        f"------------ weights applied on file kl_5"
+                        f"ml_weights applied {ml_weights[0]} {chr(10)}"
+                        f"ml_weights reference applied before {ref_ml_weights[0]} {chr(10)}",
+                    )
+                else: 
+                    ml_weights = weights / proc_inst.x.sum_abs_weights * proc_inst.x.N_events
+                # __import__("IPython").embed()
 
                 # transform ml weights to handle negative weights
                 m_negative_weights = ml_weights < 0
@@ -315,8 +378,7 @@ class MLClassifierBase(MLModel):
                     (weights, "weights"),
                     (ml_weights, "ml_weights"),
                 ):
-                    if len(events) != 0:
-                        array[...] = array[shuffle_indices]
+                    array[...] = array[shuffle_indices]
                     add_arrays(array, key)
 
             # concatenate arrays per process
@@ -354,66 +416,37 @@ class MLClassifierBase(MLModel):
                 proc_inst.x.ml_process_weight
             )
 
-        # if requested, merge per process
-        if not per_process:
-            def merge_processes(inputs: DotDict[any, DotDict[any: np.array]]):
-                return DotDict({
-                    key: np.concatenate([inputs[proc][key] for proc in inputs.keys()])
-                    for key in list(inputs.values())[0].keys()
-                })
+        return train, validation
 
-            validation = merge_processes(validation)
-            train = merge_processes(train)
+    def merge_processes(self, inputs: DotDict[any, DotDict[any: np.array]]):
+        """ Helper function to concatenate arrays in double-dict structure """
+        return DotDict({
+            key: np.concatenate([inputs[proc][key] for proc in inputs.keys()])
+            for key in list(inputs.values())[0].keys()
+        })
 
-            # shuffle all events
-            for inp in (train, validation):
-                np.random.shuffle(shuffle_indices := np.array(range(len(inp.inputs))))
-                for key in _inp.keys():
-                    inp[key] = inp[key][shuffle_indices]
+    def merge_and_shuffle(self, train, validation):
+        """ Helper function to merge and shuffle training and validation inputs """
+        train = self.merge_processes(train)
+        validation = self.merge_processes(validation)
+
+        # shuffle all events
+        for inp in (train, validation):
+            np.random.shuffle(shuffle_indices := np.array(range(len(inp.inputs))))
+            for key in inp.keys():
+                inp[key] = inp[key][shuffle_indices]
 
         return train, validation
 
+    @abstractmethod
     def prepare_ml_model(
         self,
         task: law.Task,
     ):
-        """
-        Minimal implementation of a ML model
-        """
+        """ Function to define the ml model. Needs to be implemented in daughter class """
+        return
 
-        from keras.models import Sequential
-        from keras.layers import Dense, BatchNormalization
-        # from hbw.ml.tf_util import cumulated_crossentropy
-        import tensorflow as tf
-
-        n_inputs = len(set(self.input_features))
-        n_outputs = len(self.processes)
-
-        model = Sequential()
-
-        # input layer
-        model.add(BatchNormalization(input_shape=(n_inputs,)))
-
-        # hidden layers
-        model.add(Dense(units=64, activation="relu"))
-        model.add(Dense(units=64, activation="relu"))
-        model.add(Dense(units=64, activation="relu"))
-
-        # output layer
-        model.add(Dense(n_outputs, activation="softmax"))
-
-        # compile the network
-        # NOTE: the custom loss needed due to output layer changes for negative weights
-        optimizer = keras.optimizers.Adam(learning_rate=0.00050)
-        categorical_crossentropy = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
-        model.compile(
-            loss=categorical_crossentropy, #cumulated_crossentropy,
-            optimizer=optimizer,
-            weighted_metrics=["categorical_accuracy"],
-        )
-
-        return model
-
+    @abstractmethod
     def fit_ml_model(
         self,
         task: law.Task,
@@ -422,26 +455,8 @@ class MLClassifierBase(MLModel):
         validation: DotDict[np.array],
         output: law.LocalDirectoryTarget,
     ) -> None:
-        """
-        Minimal implementation of training loop.
-        """
-        from hbw.ml.tf_util import MultiDataset
-
-        with tf.device("CPU"):
-            tf_train = MultiDataset(data=train, batch_size=self.batchsize, kind="train")
-            tf_validation = tf.data.Dataset.from_tensor_slices(
-                (validation.inputs, validation.target, validation.ml_weights),
-            ).batch(self.batchsize)
-
-        logger.info("Starting training...")
-        model.fit(
-            (x for x in tf_train),
-            validation_data=tf_validation,
-            # steps_per_epoch=tf_train.max_iter_valid,
-            steps_per_epoch=tf_train.iter_smallest_process,
-            epochs=self.epochs,
-            verbose=2,
-        )
+        """ Function to run the ml training loop. Needs to be implemented in daughter class """
+        return
 
     def create_train_val_plots(
         self,
@@ -451,6 +466,9 @@ class MLClassifierBase(MLModel):
         validation: tf.data.Dataset,
         output: law.LocalDirectoryTarget,
     ) -> None:
+        output_stats = output["stats"]
+        stats = {}
+
         # store all outputs from this function in the 'plots' directory
         output = output["plots"]
 
@@ -497,19 +515,22 @@ class MLClassifierBase(MLModel):
         validation.prediction = call_func_safe(predict_numpy_on_batch, model, validation.inputs)
 
         # create some confusion matrices
-        call_func_safe(plot_confusion, model, train, output, "train", self.process_insts)
-        call_func_safe(plot_confusion, model, validation, output, "validation", self.process_insts)
+        call_func_safe(plot_confusion, model, train, output, "train", self.process_insts, stats=stats)
+        call_func_safe(plot_confusion, model, validation, output, "validation", self.process_insts, stats=stats)
         gc.collect()
 
         # create some ROC curves
-        call_func_safe(plot_roc_ovr, model, train, output, "train", self.process_insts)
-        call_func_safe(plot_roc_ovr, model, validation, output, "validation", self.process_insts)
-        call_func_safe(plot_roc_ovo, model, train, output, "train", self.process_insts)
-        call_func_safe(plot_roc_ovo, model, validation, output, "validation", self.process_insts)
+        call_func_safe(plot_roc_ovr, model, train, output, "train", self.process_insts, stats=stats)
+        call_func_safe(plot_roc_ovr, model, validation, output, "validation", self.process_insts, stats=stats)
+        # call_func_safe(plot_roc_ovo, model, train, output, "train", self.process_insts)
+        # call_func_safe(plot_roc_ovo, model, validation, output, "validation", self.process_insts)
         gc.collect()
 
         # create plots for all output nodes
         call_func_safe(plot_output_nodes, model, train, validation, output, self.process_insts)
+
+        # dump all stats into yaml file
+        output_stats.dump(stats, formatter="yaml")
 
         return
 
@@ -519,6 +540,7 @@ class MLClassifierBase(MLModel):
         input: Any,
         output: law.LocalDirectoryTarget,
     ) -> ak.Array:
+        """ Training function that is called during the MLTraining task """
         # np.random.seed(1337)  # for reproducibility
 
         physical_devices = tf.config.list_physical_devices("GPU")
@@ -552,18 +574,29 @@ class MLClassifierBase(MLModel):
         # model preparation
         #
 
+        if self.dump_arrays:
+            def dump_arrays(inputs: DotDict[any, DotDict[any, np.array]], output, type: str):
+                for proc_inst, arrays in inputs.items():
+                    outp = output.child(f"{type}_{proc_inst.name}.npz", type="f")
+                    outp.touch()
+                    np.savez(outp.fn, **arrays)
+
+            dump_arrays(train, output["arrays"], "train")
+            dump_arrays(validation, output["arrays"], "validation")
+
+            # return without training
+            return
+
         model = self.prepare_ml_model(task)
         logger.info(model.summary())
         log_memory("prepare-model")
+
         #
         # training
         #
 
         # merge validation data
-        validation = DotDict({
-            key: np.concatenate([validation[proc][key] for proc in validation.keys()])
-            for key in list(validation.values())[0].keys()
-        })
+        validation = self.merge_processes(validation)
         log_memory("val merged")
 
         # train the model
@@ -574,14 +607,12 @@ class MLClassifierBase(MLModel):
         model.save(output["mlmodel"].path)
 
         # merge train data
-        train = DotDict({
-            key: np.concatenate([train[proc][key] for proc in train.keys()])
-            for key in list(train.values())[0].keys()
-        })
+        train = self.merge_processes(train)
         log_memory("train merged")
 
         #
         # direct evaluation as part of MLTraining
+        #
 
         self.create_train_val_plots(task, model, train, validation, output)
 
@@ -598,6 +629,8 @@ class MLClassifierBase(MLModel):
         """
         Evaluation function that is run as part of the MLEvaluation task
         """
+        use_best_model = False
+
         if len(events) == 0:
             logger.warning(f"Dataset {task.dataset} is empty. No columns are produced.")
             return events
@@ -606,15 +639,16 @@ class MLClassifierBase(MLModel):
 
         # determine truth label of the dataset (-1 if not used in training)
         ml_truth_label = -1
-        if events_used_in_training:
-            process_insts = []
-            for i, proc in enumerate(self.processes):
-                proc_inst = self.config_inst.get_process(proc)
-                proc_inst.x.ml_id = i
-                process_insts.append(proc_inst)
 
-            assign_dataset_to_process(task.dataset_inst, process_insts)
-            ml_truth_label = task.dataset_inst.x.ml_process.x.ml_id
+        # ml_truth_label = -1
+        # if events_used_in_training:
+        #    process_insts = []
+        #    for i, proc in enumerate(self.processes):
+        #        proc_inst = self.config_inst.get_process(proc)
+        #        proc_inst.x.ml_id = i
+        #        process_insts.append(proc_inst)
+        #    assign_dataset_to_process(task.dataset_inst, process_insts)
+        #    ml_truth_label = task.dataset_inst.x.ml_process.x.ml_id
 
         # store the ml truth label in the events
         events = set_ak_column(
@@ -623,7 +657,13 @@ class MLClassifierBase(MLModel):
         )
 
         # separate the outputs generated by the MLTraining task
-        models, input_features, parameters = zip(*models)
+        parameters = [model["parameters"] for model in models]
+        input_features = [model["input_features"] for model in models]
+
+        if use_best_model:
+            models = [model["best_model"] for model in models]
+        else:
+            models = [model["model"] for model in models]
 
         # check that all MLTrainings were started with the same set of parameters
         from hbw.util import dict_diff
@@ -662,6 +702,7 @@ class MLClassifierBase(MLModel):
                 inputs = remove_ak_column(inputs, var)
 
         # check that all input features are present and reorder them if necessary
+
         if diff := set(inputs.fields).difference(set(self.input_features)):
             raise Exception(f"Columns {diff} are not present in the ML input events")
         if tuple(inputs.fields) != input_features:
@@ -711,4 +752,87 @@ class MLClassifierBase(MLModel):
         return events
 
 
-base_test = MLClassifierBase.derive("base_test", cls_dict={"folds": 5})
+class ExampleDNN(MLClassifierBase):
+    """ Example class how to implement a DNN from the MLClassifierBase """
+
+    # optionally overwrite input parameters
+    epochs: int = 10
+
+    def prepare_ml_model(
+        self,
+        task: law.Task,
+    ):
+        """
+        Minimal implementation of a ML model
+        """
+
+        from keras.models import Sequential
+        from keras.layers import Dense, BatchNormalization
+        from hbw.ml.tf_util import cumulated_crossentropy
+
+        n_inputs = len(set(self.input_features))
+        n_outputs = len(self.processes)
+
+        model = Sequential()
+
+        # input layer
+        model.add(BatchNormalization(input_shape=(n_inputs,)))
+
+        # hidden layers
+        model.add(Dense(units=64, activation="relu"))
+        model.add(Dense(units=64, activation="relu"))
+        model.add(Dense(units=64, activation="relu"))
+
+        # output layer
+        model.add(Dense(n_outputs, activation="softmax"))
+
+        # compile the network
+        # NOTE: the custom loss needed due to output layer changes for negative weights
+        optimizer = keras.optimizers.Adam(learning_rate=0.00050)
+        model.compile(
+            loss=cumulated_crossentropy,
+            optimizer=optimizer,
+            weighted_metrics=["categorical_accuracy"],
+        )
+
+        return model
+
+    def fit_ml_model(
+        self,
+        task: law.Task,
+        model,
+        train: DotDict[np.array],
+        validation: DotDict[np.array],
+        output: law.LocalDirectoryTarget,
+    ) -> None:
+        """
+        Minimal implementation of training loop.
+        """
+        from hbw.ml.tf_util import MultiDataset
+
+        with tf.device("CPU"):
+            tf_train = MultiDataset(data=train, batch_size=self.batchsize, kind="train")
+            tf_validation = tf.data.Dataset.from_tensor_slices(
+                (validation.inputs, validation.target, validation.ml_weights),
+            ).batch(self.batchsize)
+
+        logger.info("Starting training...")
+        model.fit(
+            (x for x in tf_train),
+            validation_data=tf_validation,
+            # steps_per_epoch=tf_train.max_iter_valid,
+            steps_per_epoch=tf_train.iter_smallest_process,
+            epochs=self.epochs,
+            verbose=2,
+        )
+
+
+# dervive another model from the ExampleDNN class with different class attributes
+example_test = ExampleDNN.derive("example_test", cls_dict={"epochs": 5})
+
+
+# load all ml modules here
+if law.config.has_option("analysis", "ml_modules"):
+    for m in law.config.get_expanded("analysis", "ml_modules", [], split_csv=True):
+        logger.debug(f"loading ml module '{m}'")
+        maybe_import(m.strip())

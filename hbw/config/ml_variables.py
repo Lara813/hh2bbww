@@ -202,77 +202,48 @@ def add_ml_variables(config: od.Config) -> None:
         x_title=r"$S_{min}$",
     )
     config.add_variable(
-        name="mli_mll",
-        expression="mli_mll",
-        binning=(40, 0, 80),
-        x_title=r"$m_{ll}$",
-    )
-    config.add_variable(
-        name="mli_dr_ll",
-        expression="mli_dr_ll",
+        name="mli_mindr_jj",
+        expression="mli_mindr_jj",
         binning=(40, 0, 8),
-        x_title=r"$\Delta R(ll)$",
+        x_title=r"min $\Delta R(j,j)$",
     )
     config.add_variable(
-        name="mli__min_dr_llbb",
-        expression="mli_min_dr_llbb",
-        binning=(40, 0, 8),
-        x_title=r"$\Delta R(bb,ll)$",
+        name="mli_vbf_deta",
+        expression="mli_vbf_deta",
+        binning=(50, 2, 9.5),
+        x_title=r"$\Delta\eta(vbfjet1,vbfjet2)$",
     )
     config.add_variable(
-        name="mli_bb_pt",
-        expression="mli_bb_pt",
-        binning=(40, 0, 500),
+        name="mli_vbf_invmass",
+        expression="mli_vbf_invmass",
+        binning=(50, 400, 4000),
         unit="GeV",
-        x_title=r"$bb_p_T$",
+        x_title="invarint mass of two vbf jets",
     )
     config.add_variable(
-        name="mli_mllMET",
-        expression="mli_mllMET",
-        binning=(40, 0, 200),
-        x_title=r"$m_{llMET}$",
-    )
-    config.add_variable(
-        name="mli_dr_bb_llMET",
-        expression="mli_dr_bb_llMET",
-        binning=(40, 0, 8),
-        x_title=r"$\Delta R(bb,llMET)$",
-    )
-    config.add_variable(
-        name="mli_dphi_bb_llMET",
-        expression="mli_dphi_bb_llMET",
-        binning=(40, 0, 8),
-        x_title=r"$\Delta \phi(bb,llMET)$",
-    )
-    config.add_variable(
-        name="mli_mbbllMET",
-        expression="mli_mbbllMET",
-        binning=(40, 0, 500),
-        unit="GeV",
-        x_title=r"$m_{bbllMET}$",
-    )
-    config.add_variable(
-        name="mli_dphi_ll",
-        expression="mli_dphi_ll",
-        binning=(40, 0, 8),
-        unit="GeV",
-        x_title=r"$\Delta \phi_{ll}$",
-    )
-    config.add_variable(
-        name="mli_ll_pt",
-        expression="mli_ll_pt",
-        binning=(40, 0, 200),
-        unit="GeV",
-        x_title=r"$ll p_T$",
+        name="mli_vbf_tag",
+        expression="mli_vbf_tag",
+        binning=(2, -0.5, 1.5),
+        x_title="existence of at least two vbf jets = 1, else 0",
     )
 
-    for obj in ["b1", "b2", "j1", "j2", "lep", "lep2", "met"]:
+    for obj in ["b1", "b2", "j1", "j2"]:
+        for var in ["btagDeepFlavB"]:
+            config.add_variable(
+                name=f"mli_{obj}_{var}",
+                expression=f"mli_{obj}_{var}",
+                binning=default_var_binning[var],
+                unit=default_var_unit.get(var, "1"),
+                x_title="{obj} {var}".format(obj=obj, var=var),
+            )
+
+    for obj in ["b1", "b2", "j1", "j2", "lep", "met"]:
         for var in ["pt", "eta"]:
             config.add_variable(
                 name=f"mli_{obj}_{var}",
                 expression=f"mli_{obj}_{var}",
                 binning=default_var_binning[var],
-                unit=default_var_unit.get(var, var),
+                unit=default_var_unit.get(var, "1"),
                 x_title="{obj} {var}".format(obj=obj, var=var),
             )
 
@@ -282,6 +253,6 @@ def add_ml_variables(config: od.Config) -> None:
                 name=f"mli_{obj}_{var}",
                 expression=f"mli_{obj}_{var}",
                 binning=default_var_binning[var],
-                unit=default_var_unit.get(var, var),
+                unit=default_var_unit.get(var, "1"),
                 x_title="{obj} {var}".format(obj=obj, var=var),
             )

@@ -1,14 +1,13 @@
 # coding: utf-8
 
 """
-Configuration of the Run 2 HH -> bbWW analysis.
+Configuration of the Run 2 HH -> bbWW config.
 """
 
 from __future__ import annotations
 
 import os
 import re
-from typing import Set
 
 import yaml
 from scinum import Number
@@ -16,14 +15,13 @@ import law
 import order as od
 
 from columnflow.util import DotDict
-from columnflow.config_util import get_root_processes_from_campaign
 from hbw.config.styling import stylize_processes
 from hbw.config.categories import add_categories_selection
 from hbw.config.variables import add_variables
-from hbw.config.datasets import get_dataset_lfns, get_custom_hh_datasets
+from hbw.config.datasets import add_hbw_datasets, configure_hbw_datasets
+from hbw.config.processes import add_hbw_processes
 from hbw.config.defaults_and_groups import set_config_defaults_and_groups
 from hbw.util import four_vec
-
 
 thisdir = os.path.dirname(os.path.abspath(__file__))
 
@@ -49,227 +47,34 @@ def add_config(
     if year != 2017:
         raise NotImplementedError("For now, only 2017 campaign is fully implemented")
 
-    # load custom produced datasets into campaign
-    get_custom_hh_datasets(campaign)
-
-    # get all root processes
-    procs = get_root_processes_from_campaign(campaign)
-
     # create a config by passing the campaign, so id and name will be identical
     cfg = analysis.add_config(campaign, name=config_name, id=config_id, tags=analysis.tags)
+    cfg.add_tag("is_run2")
 
-    # use custom get_dataset_lfns function
-    cfg.x.get_dataset_lfns = get_dataset_lfns
+    if cfg.has_tag("is_sl"):
+        cfg.x.lepton_tag = "sl"
+    elif cfg.has_tag("is_dl"):
+        cfg.x.lepton_tag = "dl"
+    else:
+        raise Exception(f"config {cfg.name} needs either the 'is_sl' or 'is_dl' tag")
 
-    # add processes we are interested in
-    cfg.add_process(procs.n.data)
-    cfg.add_process(procs.n.tt)
-    cfg.add_process(procs.n.st)
-    cfg.add_process(procs.n.w_lnu)
-    cfg.add_process(procs.n.dy_lep)
-    cfg.add_process(procs.n.qcd)
-    cfg.add_process(procs.n.qcd_mu)
-    cfg.add_process(procs.n.qcd_em)
-    cfg.add_process(procs.n.qcd_bctoe)
-    # cfg.add_process(procs.n.ttv)
-    # cfg.add_process(procs.n.vv)
-    # cfg.add_process(procs.n.vv)
-    # cfg.add_process(procs.n.hh_ggf_bbtautau)
+    # define all resonant masspoints
+    if cfg.has_tag("is_resonant"):
+        cfg.x.graviton_masspoints = cfg.x.radion_masspoints = (
+            250, 260, 270, 280, 300, 320, 350, 400, 450, 500,
+            550, 600, 650, 700, 750, 800, 850, 900, 1000,
+            1250, 1500, 1750, 2000, 2500, 3000,
+        )
 
-    if cfg.has_tag("is_sl") and cfg.has_tag("is_nonresonant"):
-        cfg.add_process(procs.n.ggHH_kl_0_kt_1_sl_hbbhww)
-        cfg.add_process(procs.n.ggHH_kl_1_kt_1_sl_hbbhww)
-        cfg.add_process(procs.n.ggHH_kl_2p45_kt_1_sl_hbbhww)
-        cfg.add_process(procs.n.ggHH_kl_5_kt_1_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_1_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_0_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_2_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_0_kl_1_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_2_kl_1_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww)
-
-    if cfg.has_tag("is_dl") and cfg.has_tag("is_nonresonant"):
-        cfg.add_process(procs.n.ggHH_kl_0_kt_1_dl_hbbhww)
-        cfg.add_process(procs.n.ggHH_kl_1_kt_1_dl_hbbhww)
-        cfg.add_process(procs.n.ggHH_kl_2p45_kt_1_dl_hbbhww)
-        cfg.add_process(procs.n.ggHH_kl_5_kt_1_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_1_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_0_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_1_kl_2_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_0_kl_1_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1_C2V_2_kl_1_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww)
-        cfg.add_process(procs.n.qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww)
-
-    # QCD process customization
-    cfg.get_process("qcd_mu").label = "QCD Muon enriched"
-    qcd_ele = cfg.add_process(
-        name="qcd_ele",
-        id=31199,
-        xsecs={13: cfg.get_process("qcd_em").get_xsec(13) + cfg.get_process("qcd_bctoe").get_xsec(13)},
-        label="QCD Electron enriched",
-    )
-    qcd_ele.add_process(cfg.get_process("qcd_em"))
-    qcd_ele.add_process(cfg.get_process("qcd_bctoe"))
-
-    # Custom v_lep process for ML Training, combining W+DY
-    v_lep = cfg.add_process(
-        name="v_lep",
-        id=81575573,  # random number
-        xsecs={13: cfg.get_process("w_lnu").get_xsec(13) + cfg.get_process("dy_lep").get_xsec(13)},
-        label="W and DY",
-    )
-    v_lep.add_process(cfg.get_process("w_lnu"))
-    v_lep.add_process(cfg.get_process("dy_lep"))
-
-    # Custom t_bkg process for ML Training, combining W+DY
-    t_bkg = cfg.add_process(
-        name="t_bkg",
-        id=64575573,  # random number
-        xsecs={13: cfg.get_process("tt").get_xsec(13) + cfg.get_process("st").get_xsec(13)},
-        label="tt and st",
-    )
-    t_bkg.add_process(cfg.get_process("tt"))
-    t_bkg.add_process(cfg.get_process("st"))
+    # add relevant processes to config
+    add_hbw_processes(cfg, campaign)
 
     # set color of some processes
     stylize_processes(cfg)
 
-    # add datasets we need to study
-    dataset_names = [
-        # DATA
-        "data_e_b",
-        "data_e_c",
-        "data_e_d",
-        "data_e_e",
-        "data_e_f",
-        "data_mu_b",
-        "data_mu_c",
-        "data_mu_d",
-        "data_mu_e",
-        "data_mu_f",
-        # TTbar
-        "tt_sl_powheg",
-        "tt_dl_powheg",
-        "tt_fh_powheg",
-        # SingleTop
-        "st_tchannel_t_powheg",
-        "st_tchannel_tbar_powheg",
-        "st_twchannel_t_powheg",
-        "st_twchannel_tbar_powheg",
-        "st_schannel_lep_amcatnlo",
-        # "st_schannel_had_amcatnlo",  # NOTE: this dataset produces some weird errors, so skip it for now
-        # WJets
-        "w_lnu_ht70To100_madgraph",
-        "w_lnu_ht100To200_madgraph",
-        "w_lnu_ht200To400_madgraph",
-        "w_lnu_ht400To600_madgraph",
-        "w_lnu_ht600To800_madgraph",
-        "w_lnu_ht800To1200_madgraph",
-        "w_lnu_ht1200To2500_madgraph",
-        "w_lnu_ht2500_madgraph",
-        # DY
-        "dy_lep_m50_ht70to100_madgraph",
-        "dy_lep_m50_ht100to200_madgraph",
-        "dy_lep_m50_ht200to400_madgraph",
-        "dy_lep_m50_ht400to600_madgraph",
-        "dy_lep_m50_ht600to800_madgraph",
-        "dy_lep_m50_ht800to1200_madgraph",
-        "dy_lep_m50_ht1200to2500_madgraph",
-        "dy_lep_m50_ht2500_madgraph",
-        # QCD (no LHEScaleWeight)
-        "qcd_mu_pt15to20_pythia", "qcd_mu_pt20to30_pythia",
-        "qcd_mu_pt30to50_pythia", "qcd_mu_pt50to80_pythia",
-        "qcd_mu_pt80to120_pythia", "qcd_mu_pt120to170_pythia",
-        "qcd_mu_pt170to300_pythia", "qcd_mu_pt300to470_pythia",
-        "qcd_mu_pt470to600_pythia", "qcd_mu_pt600to800_pythia",
-        "qcd_mu_pt800to1000_pythia", "qcd_mu_pt1000_pythia",
-        "qcd_em_pt15to20_pythia", "qcd_em_pt20to30_pythia",
-        "qcd_em_pt30to50_pythia", "qcd_em_pt50to80_pythia",
-        "qcd_em_pt80to120_pythia", "qcd_em_pt120to170_pythia",
-        "qcd_em_pt170to300_pythia", "qcd_em_pt300toInf_pythia",
-        "qcd_bctoe_pt15to20_pythia", "qcd_bctoe_pt20to30_pythia",
-        "qcd_bctoe_pt30to80_pythia", "qcd_bctoe_pt80to170_pythia",
-        "qcd_bctoe_pt170to250_pythia", "qcd_bctoe_pt250toInf_pythia",
-        # TTV, VV -> ignore?; Higgs -> not used in Msc, but would be interesting
-        # HH(bbtautau)
-        # "hh_ggf_bbtautau_madgraph",
-    ]
-
-    if cfg.has_tag("is_sl") and cfg.has_tag("is_nonresonant"):
-        # non-resonant HH -> bbWW(qqlnu) Signal
-        dataset_names += [
-            "ggHH_kl_0_kt_1_sl_hbbhww_powheg",
-            "ggHH_kl_1_kt_1_sl_hbbhww_powheg",
-            "ggHH_kl_2p45_kt_1_sl_hbbhww_powheg",
-            "ggHH_kl_5_kt_1_sl_hbbhww_powheg",
-            # custom samples (TODO: should we include a parameter to switch between custom/offical samples?)
-            # "ggHH_kl_0_kt_1_sl_hbbhww_custom",
-            # "ggHH_kl_1_kt_1_sl_hbbhww_custom",
-            # "ggHH_kl_2p45_kt_1_sl_hbbhww_custom",
-            # "ggHH_kl_5_kt_1_sl_hbbhww_custom",
-            "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_1_kl_0_sl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_1_kl_2_sl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_0_kl_1_sl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_2_kl_1_sl_hbbhww_madgraph",
-            "qqHH_CV_0p5_C2V_1_kl_1_sl_hbbhww_madgraph",
-            "qqHH_CV_1p5_C2V_1_kl_1_sl_hbbhww_madgraph",
-        ]
-
-    if cfg.has_tag("is_dl") and cfg.has_tag("is_nonresonant"):
-        # non-resonant HH -> bbWW(lnulnu) Signal
-        dataset_names += [
-            "ggHH_kl_0_kt_1_dl_hbbhww_powheg",
-            "ggHH_kl_1_kt_1_dl_hbbhww_powheg",
-            "ggHH_kl_2p45_kt_1_dl_hbbhww_powheg",
-            "ggHH_kl_5_kt_1_dl_hbbhww_powheg",
-            "qqHH_CV_1_C2V_1_kl_1_dl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_1_kl_0_dl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_1_kl_2_dl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_0_kl_1_dl_hbbhww_madgraph",
-            "qqHH_CV_1_C2V_2_kl_1_dl_hbbhww_madgraph",
-            "qqHH_CV_0p5_C2V_1_kl_1_dl_hbbhww_madgraph",
-            "qqHH_CV_1p5_C2V_1_kl_1_dl_hbbhww_madgraph",
-        ]
-    if cfg.has_tag("is_resonant"):
-        logger.warning(f"For analysis {analysis.name}: resonant samples still needs to be implemented")
-
-    for dataset_name in dataset_names:
-        dataset = cfg.add_dataset(campaign.get_dataset(dataset_name))
-
-        if limit_dataset_files:
-            # apply optional limit on the max. number of files per dataset
-            for info in dataset.info.values():
-                if info.n_files > limit_dataset_files:
-                    info.n_files = limit_dataset_files
-
-        # add aux info to datasets
-        # TODO: switch from aux to tags for booleans
-        if dataset.name.startswith(("st", "tt")):
-            dataset.x.has_top = True
-            dataset.add_tag("has_top")
-        if dataset.name.startswith("tt"):
-            dataset.x.is_ttbar = True
-            dataset.add_tag("is_ttbar")
-        if dataset.name.startswith("qcd"):
-            dataset.x.is_qcd = True
-            dataset.add_tag("is_qcd")
-        if "HH" in dataset.name and "hbbhww" in dataset.name:
-            # TODO: the is_hbw tag is used at times were we should ask for is_hbw_sl
-            dataset.add_tag("is_hbw")
-            dataset.x.is_hbw = True
-            if "_sl_" in dataset.name:
-                dataset.add_tag("is_hbw_sl")
-            elif "_dl_" in dataset.name:
-                dataset.add_tag("is_hbw_dl")
-
-        if dataset.name.startswith("qcd") or dataset.name.startswith("qqHH_"):
-            dataset.x.skip_scale = True
-            dataset.x.skip_pdf = True
-            dataset.add_tag("skip_scale")
-            dataset.add_tag("skip_pdf")
+    # add and configure relevant datasets to config
+    add_hbw_datasets(cfg, campaign)
+    configure_hbw_datasets(cfg, limit_dataset_files)
 
     # lumi values in inverse pb
     # https://twiki.cern.ch/twiki/bin/view/CMS/LumiRecommendationsRun2?rev=2#Combination_and_correlations
@@ -449,7 +254,8 @@ def add_config(
     cfg.x.muon_sf_names = ("NUM_TightRelIso_DEN_TightIDandIPCut", f"{year}{corr_postfix}_UL")
 
     # helper to add column aliases for both shifts of a source
-    def add_aliases(shift_source: str, aliases: Set[str], selection_dependent: bool):
+    # TODO: switch to the columnflow function (but what happened to *selection_dependent*?)
+    def add_shift_aliases(shift_source: str, aliases: dict[str], selection_dependent: bool):
 
         for direction in ["up", "down"]:
             shift = cfg.get_shift(od.Shift.join_name(shift_source, direction))
@@ -469,22 +275,28 @@ def add_config(
     cfg.add_shift(name="hdamp_down", id=4, type="shape", tags={"disjoint_from_nominal"})
     cfg.add_shift(name="minbias_xs_up", id=7, type="shape")
     cfg.add_shift(name="minbias_xs_down", id=8, type="shape")
-    add_aliases("minbias_xs", {"pu_weight": "pu_weight_{name}"}, selection_dependent=False)
+    add_shift_aliases(
+        "minbias_xs",
+        {
+            "pu_weight": "pu_weight_{name}",
+            "normalized_pu_weight": "normalized_pu_weight_{name}",
+        },
+        selection_dependent=False)
     cfg.add_shift(name="top_pt_up", id=9, type="shape")
     cfg.add_shift(name="top_pt_down", id=10, type="shape")
-    add_aliases("top_pt", {"top_pt_weight": "top_pt_weight_{direction}"}, selection_dependent=False)
+    add_shift_aliases("top_pt", {"top_pt_weight": "top_pt_weight_{direction}"}, selection_dependent=False)
 
     cfg.add_shift(name="e_sf_up", id=40, type="shape")
     cfg.add_shift(name="e_sf_down", id=41, type="shape")
     cfg.add_shift(name="e_trig_sf_up", id=42, type="shape")
     cfg.add_shift(name="e_trig_sf_down", id=43, type="shape")
-    add_aliases("e_sf", {"electron_weight": "electron_weight_{direction}"}, selection_dependent=False)
+    add_shift_aliases("e_sf", {"electron_weight": "electron_weight_{direction}"}, selection_dependent=False)
 
     cfg.add_shift(name="mu_sf_up", id=50, type="shape")
     cfg.add_shift(name="mu_sf_down", id=51, type="shape")
     cfg.add_shift(name="mu_trig_sf_up", id=52, type="shape")
     cfg.add_shift(name="mu_trig_sf_down", id=53, type="shape")
-    add_aliases("mu_sf", {"muon_weight": "muon_weight_{direction}"}, selection_dependent=False)
+    add_shift_aliases("mu_sf", {"muon_weight": "muon_weight_{direction}"}, selection_dependent=False)
 
     btag_uncs = [
         "hf", "lf", f"hfstats1_{year}", f"hfstats2_{year}",
@@ -493,7 +305,7 @@ def add_config(
     for i, unc in enumerate(btag_uncs):
         cfg.add_shift(name=f"btag_{unc}_up", id=100 + 2 * i, type="shape")
         cfg.add_shift(name=f"btag_{unc}_down", id=101 + 2 * i, type="shape")
-        add_aliases(
+        add_shift_aliases(
             f"btag_{unc}",
             {
                 "normalized_btag_weight": f"normalized_btag_weight_{unc}_" + "{direction}",
@@ -512,8 +324,8 @@ def add_config(
     cfg.add_shift(name="pdf_down", id=208, type="shape")
 
     for unc in ["mur", "muf", "murf_envelope", "pdf"]:
-        # add_aliases(unc, {f"{unc}_weight": f"{unc}_weight_" + "{direction}"}, selection_dependent=False)
-        add_aliases(
+        # add_shift_aliases(unc, {f"{unc}_weight": f"{unc}_weight_" + "{direction}"}, selection_dependent=False)
+        add_shift_aliases(
             unc,
             {f"normalized_{unc}_weight": f"normalized_{unc}_weight_" + "{direction}"},
             selection_dependent=False,
@@ -525,7 +337,7 @@ def add_config(
         idx = all_jec_sources.index(jec_source)
         cfg.add_shift(name=f"jec_{jec_source}_up", id=5000 + 2 * idx, type="shape")
         cfg.add_shift(name=f"jec_{jec_source}_down", id=5001 + 2 * idx, type="shape")
-        add_aliases(
+        add_shift_aliases(
             f"jec_{jec_source}",
             {"Jet.pt": "Jet.pt_{name}", "Jet.mass": "Jet.mass_{name}"},
             selection_dependent=True,
@@ -533,7 +345,7 @@ def add_config(
 
     cfg.add_shift(name="jer_up", id=6000, type="shape", tags={"selection_dependent"})
     cfg.add_shift(name="jer_down", id=6001, type="shape", tags={"selection_dependent"})
-    add_aliases("jer", {"Jet.pt": "Jet.pt_{name}", "Jet.mass": "Jet.mass_{name}"}, selection_dependent=True)
+    add_shift_aliases("jer", {"Jet.pt": "Jet.pt_{name}", "Jet.mass": "Jet.mass_{name}"}, selection_dependent=True)
 
     def make_jme_filename(jme_aux, sample_type, name, era=None):
         """
@@ -549,7 +361,7 @@ def add_config(
         return f"{jme_aux.source}/{jme_full_version}/{jme_full_version}_{name}_{jme_aux.jet_type}.txt"
 
     # external files
-    json_mirror = "/afs/cern.ch/user/m/mrieger/public/mirrors/jsonpog-integration-dfd90038"
+    json_mirror = "/afs/cern.ch/user/m/mrieger/public/mirrors/jsonpog-integration-9ea86c4c"
     cfg.x.external_files = DotDict.wrap({
         # jet energy correction
         "jet_jerc": (f"{json_mirror}/POG/JME/{year}{corr_postfix}_UL/jet_jerc.json.gz", "v1"),
@@ -571,6 +383,19 @@ def add_config(
     # TODO: generalize to different years
     if year != 2017:
         raise NotImplementedError("TODO: generalize external files to different years than 2017")
+
+    cfg.x.met_filters = {
+        "Flag.goodVertices",
+        "Flag.globalSuperTightHalo2016Filter",
+        "Flag.HBHENoiseFilter",
+        "Flag.HBHENoiseIsoFilter",
+        "Flag.EcalDeadCellTriggerPrimitiveFilter",
+        "Flag.BadPFMuonFilter",
+        "Flag.BadPFMuonDzFilter",  # this filter does not work with our EOY Signal samples
+        "Flag.eeBadScFilter",
+    }
+    if cfg.has_tag("is_run3"):
+        cfg.x.noise_filter.add("ecalBadCalibFilter")
 
     cfg.x.external_files.update(DotDict.wrap({
         # files from TODO
@@ -607,13 +432,15 @@ def add_config(
             "run", "luminosityBlock", "event",
             # columns added during selection, required in general
             "mc_weight", "PV.npvs", "process_id", "category_ids", "deterministic_seed",
+            # Gen information (for categorization)
+            "HardGenPart.pdgId",
             # weight-related columns
             "pu_weight*", "pdf_weight*",
             "murf_envelope_weight*", "mur_weight*", "muf_weight*",
             "btag_weight*",
         } | four_vec(  # Jets
             {"Jet", "Bjet", "VBFJet"},
-            {"btagDeepFlavB", "hadronFlavour"},
+            {"btagDeepFlavB", "hadronFlavour", "qgl"},
         ) | four_vec(  # FatJets
             {"FatJet", "HbbJet"},
             {
@@ -638,8 +465,10 @@ def add_config(
 
     # NOTE: which to use, njet_btag_weight or btag_weight?
     cfg.x.event_weights["normalized_btag_weight"] = get_shifts(*(f"btag_{unc}" for unc in btag_uncs))
-    # TODO: fix pu_weight; takes way too large values (from 0 to 160)
-    # cfg.x.event_weights["normalized_pu_weight"] = get_shifts("minbias_xs")
+    cfg.x.event_weights["normalized_pu_weight"] = get_shifts("minbias_xs")
+    cfg.x.event_weights["electron_weight"] = get_shifts("e_sf")
+    cfg.x.event_weights["muon_weight"] = get_shifts("mu_sf")
+
     for dataset in cfg.datasets:
         dataset.x.event_weights = DotDict()
         if not dataset.has_tag("skip_scale"):
@@ -692,13 +521,8 @@ def add_config(
     if cfg.has_tag("is_dl") and cfg.has_tag("is_nonresonant"):
         from hbw.config.dl import configure_dl
         configure_dl(cfg)
-    if cfg.has_tag("is_resonant"):
-        # from hbw.config.resonant import configure_resonant
-        configure_resonant(cfg)
+    if cfg.has_tag("is_sl") and cfg.has_tag("is_resonant"):
+        from hbw.config.sl_res import configure_sl_res
+        configure_sl_res(cfg)
 
     return cfg
-
-
-def configure_resonant(config: od.Config):
-    # TODO?
-    return

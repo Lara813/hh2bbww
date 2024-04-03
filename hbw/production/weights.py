@@ -85,7 +85,12 @@ def event_weights_to_normalize(self: Producer, events: ak.Array, results: Select
 
     if not self.dataset_inst.has_tag("skip_pdf"):
         # compute pdf weights
-        events = self[pdf_weights](events, **kwargs)
+        events = self[pdf_weights](
+            events,
+            outlier_action="remove",
+            outlier_log_mode="warning",
+            **kwargs,
+        )
 
     return events
 
@@ -114,16 +119,22 @@ normalized_pdf_weights = normalized_weight_factory(
     weight_producers={pdf_weights},
 )
 
+normalized_pu_weights = normalized_weight_factory(
+    producer_name="normalized_pu_weights",
+    weight_producers={pu_weight},
+)
+
 
 @producer(
     uses={
         normalization_weights, electron_weights, muon_weights, btag_weights,
-        normalized_btag_weights, event_weight,
+        normalized_btag_weights, normalized_pu_weights,
+        event_weight,
     },
     produces={
-        "mc_weight",  # might be needed for ML
         normalization_weights, electron_weights, muon_weights,
-        normalized_btag_weights, event_weight,
+        normalized_btag_weights, normalized_pu_weights,
+        event_weight,
     },
     mc_only=True,
 )
@@ -144,6 +155,7 @@ def event_weights(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
 
     # normalize event weights using stats
     events = self[normalized_btag_weights](events, **kwargs)
+    events = self[normalized_pu_weights](events, **kwargs)
 
     if not self.dataset_inst.has_tag("skip_scale"):
         events = self[normalized_scale_weights](events, **kwargs)

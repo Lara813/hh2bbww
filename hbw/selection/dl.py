@@ -9,6 +9,7 @@ from typing import Tuple
 
 from columnflow.util import maybe_import
 from columnflow.columnar_util import set_ak_column
+from columnflow.columnar_util import EMPTY_FLOAT
 
 from columnflow.selection import Selector, SelectionResult, selector
 # from columnflow.production.categories import category_ids
@@ -40,6 +41,7 @@ def invariant_mass(events: ak.Array):
     where = ak.num(events, axis=1) == 2
     events_with_2 = ak.where(where, events, empty_events)
     mass = ak.fill_none(ak.firsts((TetraVec(events_with_2[:, :1]) + TetraVec(events_with_2[:, 1:2])).mass), 0)
+    mass = ak.nan_to_num(mass, nan=EMPTY_FLOAT)
     return mass
 
 
@@ -68,17 +70,17 @@ def dl_jet_selection(
         ak.all(events.Jet.metric_table(lepton_results.x.lepton) > 0.3, axis=2)
     )
     events = set_ak_column(events, "cutflow.n_jet", ak.sum(jet_mask, axis=1))
-    jet_sel = events.cutflow.n_jet >= 2
+    jet_sel = events.cutflow.n_jet >= 1
     jet_indices = masked_sorted_indices(jet_mask, events.Jet.pt)
 
     # b-tagged jets, medium working point
     wp_med = self.config_inst.x.btag_working_points.deepjet.medium
     btag_mask = (jet_mask) & (events.Jet.btagDeepFlavB >= wp_med)
     events = set_ak_column(events, "cutflow.n_deepjet_med", ak.sum(btag_mask, axis=1))
-    btag_sel = events.cutflow.n_deepjet_med >= 2
+    btag_sel = events.cutflow.n_deepjet_med >= 1
 
     # define b-jets as the two b-score leading jets, b-score sorted
-    bjet_indices = masked_sorted_indices(jet_mask, events.Jet.btagDeepFlavB)[:, :2]
+    bjet_indices = masked_sorted_indices(btag_mask, events.Jet.btagDeepFlavB)[:, :2]
 
     # define lightjets as all non b-jets, pt-sorted
     b_idx = ak.fill_none(ak.pad_none(bjet_indices, 2), -1)
@@ -406,7 +408,7 @@ def dl(
     # combined event selection after all steps
     # NOTE: we only apply the b-tagging step when no AK8 Jet is present; if some event with AK8 jet
     #       gets categorized into the resolved category, we might need to cut again on the number of b-jets
-    results.main["event"] = (
+    results.event = (
         results.steps.all_but_bjet &
         ((results.steps.Jet & results.steps.Bjet) | results.steps.HbbJet)
     )

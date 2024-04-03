@@ -56,29 +56,14 @@ setup_hbw() {
     # interactive setup
     if [ "${CF_REMOTE_JOB}" != "1" ]; then
     	cf_setup_interactive_body() {
-            # start querying for variables
-            query CF_CERN_USER "CERN username" "$( whoami )"
-            export_and_save CF_CERN_USER_FIRSTCHAR "\${CF_CERN_USER:0:1}"
-            query CF_DATA "Local data directory" "\$HBW_BASE/data" "./data"
-            query CF_STORE_NAME "Relative path used in store paths (see next queries)" "hbw_store"
-            query CF_STORE_LOCAL "Default local output store" "\$CF_DATA/\$CF_STORE_NAME"
-            query CF_WLCG_CACHE_ROOT "Local directory for caching remote files" "" "''"
-            export_and_save CF_WLCG_USE_CACHE "$( [ -z "${CF_WLCG_CACHE_ROOT}" ] && echo false || echo true )"
-            export_and_save CF_WLCG_CACHE_CLEANUP "${CF_WLCG_CACHE_CLEANUP:-false}"
-            query CF_SOFTWARE_BASE "Local directory for installing software" "\$CF_DATA/software"
-            query CF_JOB_BASE "Local directory for storing job files" "\$CF_DATA/jobs"
-            query CF_VOMS "Virtual-organization" "cms:/cms/dcms"
-            export_and_save CF_TASK_NAMESPACE "${CF_TASK_NAMESPACE:-cf}"
-            query CF_LOCAL_SCHEDULER "Use a local scheduler for law tasks" "True"
-            if [ "${CF_LOCAL_SCHEDULER}" != "True" ]; then
-		query CF_SCHEDULER_HOST "Address of a central scheduler for law tasks" "naf-cms15.desy.de"
-		query CF_SCHEDULER_PORT "Port of a central scheduler for law tasks" "8082"
-            else
-		export_and_save CF_SCHEDULER_HOST "127.0.0.1"
-		export_and_save CF_SCHEDULER_PORT "8082"
-            fi
-            query HBW_BUNDLE_CMSSW "Install and bundle CMSSW sandboxes for job submission?" "True"
-	    query HBW_LAW_CONFIG "Name of the file to be used as law config (must be located in $HBW_BASE)" "law.sl.nocert.cfg"
+            # pre-export the CF_FLAVOR which will be cms
+            export CF_FLAVOR="cms"
+
+            # query common variables
+            cf_setup_interactive_common_variables
+
+            # query specific variables
+            query HBW_LAW_CONFIG "Name of the file to be used as law config (must be located in $HBW_BASE)" "law.sl.cfg"
 	}
 	cf_setup_interactive "${CF_SETUP_NAME}" "${HBW_BASE}/.setups/${CF_SETUP_NAME}.sh" || return "$?"
     fi
@@ -87,7 +72,6 @@ setup_hbw() {
     export CF_CONDA_BASE="${CF_CONDA_BASE:-${CF_SOFTWARE_BASE}/conda}"
     export CF_VENV_BASE="${CF_VENV_BASE:-${CF_SOFTWARE_BASE}/venvs}"
     export CF_CMSSW_BASE="${CF_CMSSW_BASE:-${CF_SOFTWARE_BASE}/cmssw}"
-    export CF_CI_JOB="$( [ "${GITHUB_ACTIONS}" = "true" ] && echo 1 || echo 0 )"
     export HBW_LAW_CONFIG="${HBW_LAW_CONFIG:-law.sl.nocert.cfg}"
 
     #
@@ -108,19 +92,17 @@ setup_hbw() {
     export PYTHONPATH="${HBW_BASE}:${HBW_BASE}/modules/cmsdb:${PYTHONPATH}"
 
     # initialze submodules
-    if [ -d "${HBW_BASE}/.git" ]; then
+    if [ -e "${HBW_BASE}/.git" ]; then
         for m in $( ls -1q "${HBW_BASE}/modules" ); do
-            cf_init_submodule "${HBW_BASE}/modules/${m}"
+            cf_init_submodule "${HBW_BASE}" "modules/${m}"
         done
     fi
-
 
     #
     # law setup
     #
-
-    export LAW_HOME="${HBW_BASE}/.law"
-    export LAW_CONFIG_FILE="${HBW_BASE}/${HBW_LAW_CONFIG}"
+    export LAW_HOME="${LAW_HOME:-${HBW_BASE}/.law}"
+    export LAW_CONFIG_FILE="${LAW_CONFIG_FILE:-${HBW_BASE}/${HBW_LAW_CONFIG}}"
 
     if which law &> /dev/null; then
         # source law's bash completion scipt

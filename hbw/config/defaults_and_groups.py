@@ -20,14 +20,15 @@ def default_ml_model(cls, container, task_params):
     # for most tasks, do not use any default ml model
     default_ml_model = None
 
-    # the ml_model parameter is only used by `MLTraining` and `MLEvaluation`, therefore use some default
+    # set default ml_model when task is part of the MLTraining pipeline
     # NOTE: default_ml_model does not work for the MLTraining task
-    if cls.task_family in ("cf.MLTraining", "cf.MLEvaulation", "cf.MergeMLEvents", "cf.PrepareMLEvents"):
-        # TODO: we might want to distinguish between two default ML models (sl vs dl)
+    if hasattr(cls, "ml_model"):
+        # TODO: we might want to distinguish between multiple default ML models (sl vs dl)
         default_ml_model = "dense_default"
 
-    # check if task is using an inference model; if that's the case, use the default set in the model
-    if cls.task_family == "cf.CreateDatacards":
+    # check if task is using an inference model
+    # if that is the case, use the default ml_model set in the inference model
+    if getattr(cls, "inference_model", None):
         inference_model = task_params.get("inference_model", None)
 
         # if inference model is not set, assume it's the container default
@@ -41,35 +42,42 @@ def default_ml_model(cls, container, task_params):
     return default_ml_model
 
 
+def ml_inputs_producer(cls, container, task_params):
+    if container.has_tag("is_sl") and not container.has_tag("is_resonant"):
+        ml_inputs = "ml_inputs"
+    if container.has_tag("is_dl"):
+        ml_inputs = "dl_ml_inputs"
+    if container.has_tag("is_sl") and container.has_tag("is_resonant"):
+        ml_inputs = "sl_res_ml_inputs"
+    return ml_inputs
+
+
 def default_producers(cls, container, task_params):
     """ Default producers chosen based on the Inference model and the ML Model """
-    dataset_inst = task_params.get("dataset_inst", None)
 
     # per default, use the ml_inputs and event_weights
-    # TODO: we might need two ml_inputs producers in the future (sl vs dl)
-    default_producers = ["ml_inputs"]
-    if dataset_inst and dataset_inst.is_mc:
-        # run event weights producer only if it's a MC dataset
-        default_producers.append("event_weights")
+    default_producers = [ml_inputs_producer(cls, container, task_params), "event_weights"]
 
-    # check if a ml_model has been set
-    ml_model = task_params.get("mlmodel", None) or task_params.get("mlmodels", None)
+    if hasattr(cls, "ml_model"):
+        # do no further resolve the ML categorizer when this task is part of the MLTraining pipeline
+        return default_producers
+
+    # check if a mlmodel has been set
+    ml_model = task_params.get("ml_models", None)
 
     # only consider 1 ml_model
-    if isinstance(ml_model, (list, tuple)):
+    if ml_model and isinstance(ml_model, (list, tuple)):
         ml_model = ml_model[0]
 
     # try and get the default ml model if not set
     if ml_model in (None, law.NO_STR, RESOLVE_DEFAULT):
         ml_model = default_ml_model(cls, container, task_params)
 
-    # check if task is directly using the MLModel or just requires some ML output
-    is_ml_task = (cls.task_family in ("cf.MLTraining", "cf.MLEvaulation"))
-
-    # if a ML model is set, and the task is neither MLTraining nor MLEvaluation,
+    # if a ML model is set, and the task is not part of the MLTraining pipeline,
     # use the ml categorization producer
-    if ml_model not in (None, law.NO_STR, RESOLVE_DEFAULT, tuple()) and not is_ml_task:
-        default_producers.insert(0, f"ml_{ml_model}")
+    if ml_model not in (None, law.NO_STR, RESOLVE_DEFAULT, tuple()):
+        # NOTE: this producer needs to be added as the last element! otherwise, category_ids will be overwritten
+        default_producers.append(f"ml_{ml_model}")
 
     # if we're running the inference_model, we don't need the ml_inputs
     # NOTE: we cannot skip ml_inputs, because it is needed for cf.MLEvaluation
@@ -105,6 +113,7 @@ def set_config_defaults_and_groups(config_inst):
     config_inst.x.default_ml_model = default_ml_model
     config_inst.x.default_inference_model = "default"
     config_inst.x.default_categories = ["incl"]
+    config_inst.x.default_variables = ["jet1_pt"]
 
     #
     # Groups
@@ -115,6 +124,7 @@ def set_config_defaults_and_groups(config_inst):
     config_inst.x.process_groups = {
         "all": ["*"],
         "default": [default_signal_process, "tt", "st", "w_lnu", "dy_lep"],
+        "dilep": ["ggHH_kl_*", "tt", "st", "w_lnu", "dy_lep"],
         "with_qcd": [default_signal_process, "tt", "qcd", "st", "w_lnu", "dy_lep"],
         "much": [default_signal_process, "tt", "qcd_mu", "st", "w_lnu", "dy_lep"],
         "ech": [default_signal_process, "tt", "qcd_ele", "st", "w_lnu", "dy_lep"],
@@ -143,17 +153,58 @@ def set_config_defaults_and_groups(config_inst):
         "qcd": ["qcd_*"], "qcd_mu": ["qcd_mu*"], "qcd_ele": ["qcd_em*", "qcd_bctoe*"],
         "signal": ["ggHH_*", "qqHH_*"], "gghh": ["ggHH_*"], "qqhh": ["qqHH_*"],
         "ml": ["ggHH_kl_1*", "tt_*", "st_*", "dy_*", "w_lnu_*"],
-        "dilep": ["tt_*", "st_*", "dy_*", "w_lnu_*", "ggHH_*"],
+        "dilep": ["tt_*", "st_*", "dy_*", "ggHH_*", "w_lnu_*"],
     }
 
     # category groups for conveniently looping over certain categories
-    # (used during plotting)
+    # (used during plotting and for rebinning)
     config_inst.x.category_groups = {
         "much": ["1mu", "1mu__resolved", "1mu__boosted"],
         "ech": ["1e", "1e__resolved", "1e__boosted"],
         "default": ["incl", "1e", "1mu"],
         "test": ["incl", "1e"],
         "dilep": ["incl", "2e", "2mu", "emu"],
+        "SR": ("1e__ml_ggHH_kl_1_kt_1_sl_hbbhww", "1mu__ml_ggHH_kl_1_kt_1_sl_hbbhww"),
+        "vbfSR": ("1e__ml_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww", "1mu__ml_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),
+        "SR_resolved": ("1e__ml_resolved_ggHH_kl_1_kt_1_sl_hbbhww", "1mu__ml_resolved_ggHH_kl_1_kt_1_sl_hbbhww"),
+        "SR_boosted": ("1e__ml_boosted_ggHH_kl_1_kt_1_sl_hbbhww", "1mu__ml_boosted_ggHH_kl_1_kt_1_sl_hbbhww"),
+        "vbfSR_resolved": ("1e__ml_resolved_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww", "1mu__ml_resolved_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),  # noqa
+        "vbfSR_boosted": ("1e__ml_boosted_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww", "1mu__ml_boosted_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),  # noqa
+        "BR": ("1e__ml_tt", "1e__ml_st", "1e__ml_v_lep", "1mu__ml_tt", "1mu__ml_st", "1mu__ml_v_lep"),
+        "SR_dl": (
+            "2e__1b__ml_ggHH_sig",
+            "2mu__1b__ml_ggHH_sig",
+            "emu__1b__ml_ggHH_sig",
+            "2e__2b__ml_ggHH_sig",
+            "2mu__2b__ml_ggHH_sig",
+            "emu__2b__ml_ggHH_sig",
+            "2e__1b__ml_ggHH_sig_all",
+            "2mu__1b__ml_ggHH_sig_all",
+            "emu__1b__ml_ggHH_sig_all",
+            "2e__2b__ml_ggHH_sig_all",
+            "2mu__2b__ml_ggHH_sig_all",
+            "emu__2b__ml_ggHH_sig_all",
+        ),
+        "BR_dl": (
+            "2e__1b__ml_tt",
+            "2e__1b__ml_st",
+            "emu__1b__ml_tt",
+            "emu__1b__ml_st",
+            "2mu__1b__ml_tt",
+            "2mu__1b__ml_st",
+            "2e__2b__ml_tt",
+            "2e__2b__ml_st",
+            "emu__2b__ml_tt",
+            "emu__2b__ml_st",
+            "2mu__2b__ml_tt",
+            "2mu__2b__ml_st",
+            "2e__1b__ml_dy_lep",
+            "emu__1b__ml_dy_lep",
+            "2mu__1b__ml_dy_lep",
+            "2e__2b__ml_dy_lep",
+            "emu__2b__ml_dy_lep",
+            "2mu__2b__ml_dy_lep",
+        ),
     }
 
     # variable groups for conveniently looping over certain variables
@@ -165,7 +216,19 @@ def set_config_defaults_and_groups(config_inst):
         "dilep": [
             "n_jet", "n_muon", "n_electron", "ht", "m_bb", "m_ll", "deltaR_bb", "deltaR_ll",
             "ll_pt", "bb_pt", "E_miss", "delta_Phi", "MT", "min_dr_lljj",
-            "m_lljjMET", "channel_id", "n_bjet", "wp_score", "charge", "m_ll_check",
+            "m_lljjMET", "channel_id", "n_bjet", "wp_score", "m_ll_check",
+        ],
+        "control": [
+            "n_jet", "n_fatjet", "n_electron", "n_muon",
+            "jet1_pt", "jet1_eta", "jet1_phi", "jet1_btagDeepFlavB",   # "jet1_btagDeepB",
+            "jet2_pt", "jet2_eta", "jet2_phi", "jet2_btagDeepFlavB",   # "jet2_btagDeepB",
+            "jet3_pt", "jet3_eta", "jet3_phi", "jet3_btagDeepFlavB",   # "jet3_btagDeepB",
+            "jet4_pt", "jet4_eta", "jet4_phi", "jet4_btagDeepFlavB",   # "jet4_btagDeepB",
+            "fatjet1_pt", "fatjet1_eta", "fatjet1_phi", "fatjet1_btagHbb", "fatjet1_deepTagMD_HbbvsQCD",
+            "fatjet1_mass", "fatjet1_msoftdrop", "fatjet1_tau1", "fatjet1_tau2", "fatjet1_tau21",
+            "fatjet2_pt", "fatjet2_eta", "fatjet2_phi", "fatjet2_btagHbb", "fatjet2_deepTagMD_HbbvsQCD",
+            "fatjet2_mass", "fatjet2_msoftdrop", "fatjet2_tau1", "fatjet2_tau2", "fatjet2_tau21",
+            "electron_pt", "electron_eta", "electron_phi", "muon_pt", "muon_eta", "muon_phi",
         ],
     }
 
@@ -184,7 +247,7 @@ def set_config_defaults_and_groups(config_inst):
         "default": ["Lepton", "VetoLepton", "Jet", "Bjet", "Trigger"],
         "thesis": ["Lepton", "Muon", "Jet", "Trigger", "Bjet"],  # reproduce master thesis cuts for checks
         "test": ["Lepton", "Jet", "Bjet"],
-        "dilep": ["Jet", "Bjet", "Lepton", "Trigger", "TriggerAndLep"],
+        "dilep": ["Trigger", "Bjet", "Lepton"],
     }
 
     # plotting settings groups
@@ -206,9 +269,16 @@ def set_config_defaults_and_groups(config_inst):
             "ggHH_kl_1_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
             "ggHH_kl_2p45_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
             "ggHH_kl_5_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
+            "ggHH_sig_all": {"scale": 1000, "unstack": True},
         },
         "dileptest": {
             "ggHH_kl_1_kt_1_dl_hbbhww": {"scale": 10000, "unstack": True},
+        },
+        "control": {
+            "ggHH_kl_0_kt_1_sl_hbbhww": {"scale": 90000, "unstack": True},
+            "ggHH_kl_1_kt_1_sl_hbbhww": {"scale": 90000, "unstack": True},
+            "ggHH_kl_2p45_kt_1_sl_hbbhww": {"scale": 90000, "unstack": True},
+            "ggHH_kl_5_kt_1_sl_hbbhww": {"scale": 90000, "unstack": True},
         },
     }
     # when drawing DY as a line, use a different type of yellow
@@ -221,9 +291,60 @@ def set_config_defaults_and_groups(config_inst):
         },
     }
 
+    # groups for custom plot styling
+    config_inst.x.custom_style_config_groups = {
+        "example": {
+            "legend_cfg": {"title": "my custom legend title", "ncols": 2},
+            "ax_cfg": {"ylabel": "my ylabel", "xlim": (0, 100)},
+            "rax_cfg": {"ylabel": "some other ylabel"},
+            "annotate_cfg": {"text": "category label usually here"},
+        },
+    }
+
     # CSP (calibrator, selector, producer) groups
     config_inst.x.producer_groups = {
         "mli": ["ml_inputs", "event_weights"],
         "mlo": ["ml_dense_default", "event_weights"],
         "cols": ["mli", "features"],
+    }
+
+    # groups are defined via config.x.category_groups
+    config_inst.x.default_bins_per_category = {
+        "SR": 10,
+        "SR_dl": 10,
+        # "vbfSR": 5,
+        "BR_dl": 3,
+        "BR": 3,
+        "SR_resolved": 10,
+        "SR_boosted": 5,
+        "vbfSR_resolved": 5,
+        "vbfSR_boosted": 3,
+        # "SR_dl": 10,
+        # "BR_dl": 3,
+        # "1e__ml_ggHH_kl_1_kt_1_sl_hbbhww": 10,
+        # "1e__ml_tt": 3,
+        # "1e__ml_st": 3,
+        # "1e__ml_v_lep": 3,
+        # "1mu__ml_ggHH_kl_1_kt_1_sl_hbbhww": 10,
+        # "1mu__ml_tt": 3,
+        # "1mu__ml_st": 3,
+        # "1mu__ml_v_lep": 3,
+    }
+
+    config_inst.x.inference_category_rebin_processes = {
+        "SR": ("ggHH_kl_1_kt_1_dl_hbbhww"),
+        "SR_dl": ("ggHH_kl_1_kt_0_dl_hbbhww", "ggHH_kl_1_kt_1_dl_hbbhww", "ggHH_kl_2p45_kt_1_dl_hbbhww", "ggHH_kl_5_kt_1_dl_hbbhww"),
+        # "vbfSR": ("ggHH_kl_1_kt_1_sl_hbbhww", "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),
+        "BR": lambda proc_name: "hbbhww" not in proc_name,
+        "BR_dl": lambda proc_name: "hbbhww" not in proc_name,
+        # "SR_dl": ("ggHH_kl_5_kt_1_dl_hbbhww",),
+        # "BR_dl": lambda proc_name: "hbbhww" not in proc_name,
+        # "1e__ml_ggHH_kl_1_kt_1_sl_hbbhww": ("ggHH_kl_1_kt_1_sl_hbbhww", "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),
+        # "1e__ml_tt": lambda proc_name: "hbbhww" not in proc_name,
+        # "1e__ml_st": lambda proc_name: "hbbhww" not in proc_name,
+        # "1e__ml_v_lep": lambda proc_name: "hbbhww" not in proc_name,
+        # "1mu__ml_ggHH_kl_1_kt_1_sl_hbbhww":  ("ggHH_kl_1_kt_1_sl_hbbhww", "qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),
+        # "1mu__ml_tt": lambda proc_name: "hbbhww" not in proc_name,
+        # "1mu__ml_st": lambda proc_name: "hbbhww" not in proc_name,
+        # "1mu__ml_v_lep": lambda proc_name: "hbbhww" not in proc_name,
     }

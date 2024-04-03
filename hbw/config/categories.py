@@ -2,6 +2,21 @@
 
 """
 Definition of categories.
+
+Categorizer modules (used to determine category masks) are defined in hbw.selection.categories
+
+Ids for combinations of categories are built as the sum of category ids.
+To avoid reusing category ids, each category block (e.g. leptons, jets, ...) uses ids of a different
+power of 10.
+
+power of 10 | category block
+
+0: free (only used for inclusive category)
+1: jet (resolved vs boosted)
+2: bjet (1 vs geq 2)
+3: lepton
+4: dnn
+5: gen-level leptons (not combined with other categories)
 """
 
 from collections import OrderedDict
@@ -9,11 +24,68 @@ from collections import OrderedDict
 import law
 
 from columnflow.config_util import create_category_combinations
+from columnflow.ml import MLModel
 from hbw.util import call_once_on_config
 
 import order as od
 
+
 logger = law.logger.get_logger(__name__)
+
+
+def name_fn(root_cats):
+    cat_name = "__".join(cat.name for cat in root_cats.values())
+    return cat_name
+
+
+def kwargs_fn(root_cats):
+    kwargs = {
+        "id": sum([c.id for c in root_cats.values()]),
+        "label": ", ".join([c.name for c in root_cats.values()]),
+        "aux": {
+            "root_cats": {key: value.name for key, value in root_cats.items()},
+        },
+    }
+    return kwargs
+
+
+@call_once_on_config()
+def add_gen_categories(config: od.Config) -> None:
+    gen_0lep = config.add_category(  # noqa
+        name="gen_0lep",
+        id=100000,
+        selection="catid_gen_0lep",  # this should not be called!
+        label="No gen lepton",
+    )
+    gen_1lep = config.add_category(
+        name="gen_1lep",
+        id=200000,
+        label="1 gen lepton",
+    )
+    gen_1lep.add_category(
+        name="gen_1e",
+        id=300000,
+        selection="catid_gen_1e",
+        label="1 gen electron",
+    )
+    gen_1lep.add_category(
+        name="gen_1mu",
+        id=400000,
+        selection="catid_gen_1mu",
+        label="1 gen muon",
+    )
+    gen_1lep.add_category(
+        name="gen_1tau",
+        id=500000,
+        selection="catid_gen_1tau",
+        label="1 gen tau",
+    )
+    gen_2lep = config.add_category(  # noqa
+        name="gen_geq2lep",
+        id=600000,
+        selection="catid_geq_2_gen_leptons",
+        label=r"$\geq 2$ gen leptons",
+    )
 
 
 @call_once_on_config()
@@ -21,6 +93,14 @@ def add_categories_selection(config: od.Config) -> None:
     """
     Adds categories to a *config*, that are typically produced in `SelectEvents`.
     """
+
+    # adds categories based on the existence of gen particles
+    # add_gen_categories(config)
+
+    config.x.lepton_channels = {
+        "sl": ("1e", "1mu"),
+        "dl": ("2e", "2mu", "emu"),
+    }[config.x.lepton_tag]
 
     config.add_category(
         name="incl",
@@ -64,18 +144,19 @@ def add_categories_selection(config: od.Config) -> None:
         label="1 Electron 1 Muon",
     )
 
+    category_blocks = OrderedDict({
+        "lep": [config.get_category(lep_ch) for lep_ch in config.x.lepton_channels],
+    })
 
-def name_fn(root_cats):
-    cat_name = "__".join(cat.name for cat in root_cats.values())
-    return cat_name
-
-
-def kwargs_fn(root_cats):
-    kwargs = {
-        "id": sum([c.id for c in root_cats.values()]),
-        "label": ", ".join([c.name for c in root_cats.values()]),
-    }
-    return kwargs
+    """
+    n_cats = create_category_combinations(
+        config,
+        category_blocks,
+        name_fn=name_fn,
+        kwargs_fn=kwargs_fn,
+        skip_existing=False,  # there should be no existing sub-categories
+    )
+    """
 
 
 @call_once_on_config()
@@ -106,6 +187,7 @@ def add_categories_production(config: od.Config) -> None:
     # define additional 'main' categories
     #
 
+    """
     cat_resolved = config.add_category(
         name="resolved",
         id=10,
@@ -118,6 +200,7 @@ def add_categories_production(config: od.Config) -> None:
         selection="catid_boosted",
         label="boosted",
     )
+    """
 
     cat_1b = config.add_category(
         name="1b",
@@ -137,8 +220,8 @@ def add_categories_production(config: od.Config) -> None:
     #
 
     category_blocks = OrderedDict({
-        "lep": [cat_2e, cat_2mu],
-        "jet": [cat_resolved, cat_boosted],
+        "lep": [config.get_category(lep_ch) for lep_ch in config.x.lepton_channels],
+        # "jet": [cat_resolved, cat_boosted],
         "b": [cat_1b, cat_2b],
     })
 
@@ -154,6 +237,9 @@ def add_categories_production(config: od.Config) -> None:
 
 @call_once_on_config()
 def add_categories_ml(config, ml_model_inst):
+    # if not already done, get the ml_model instance
+    if isinstance(ml_model_inst, str):
+        ml_model_inst = MLModel.get_cls(ml_model_inst)(config)
 
     # add ml categories directly to the config
     ml_categories = []
@@ -168,8 +254,8 @@ def add_categories_ml(config, ml_model_inst):
         ))
 
     category_blocks = OrderedDict({
-        "lep": [config.get_category("2e"), config.get_category("2mu")],
-        "jet": [config.get_category("resolved"), config.get_category("boosted")],
+        "lep": [config.get_category(lep_ch) for lep_ch in config.x.lepton_channels],
+        # "jet": [config.get_category("resolved"), config.get_category("boosted")],
         "b": [config.get_category("1b"), config.get_category("2b")],
         "dnn": ml_categories,
     })

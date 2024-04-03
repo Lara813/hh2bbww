@@ -10,7 +10,7 @@ import law
 
 from columnflow.production import Producer, producer
 from columnflow.util import maybe_import, safe_div, InsertableDict
-from columnflow.columnar_util import set_ak_column
+from columnflow.columnar_util import set_ak_column  # , EMPTY_FLOAT
 
 ak = maybe_import("awkward")
 np = maybe_import("numpy")
@@ -45,7 +45,7 @@ def normalized_weight_factory(
                         self[prod].produced_columns.difference(events.fields) and
                         self[prod].used_columns.intersection(events.fields)
                 ):
-                    print(f"Rerun producer {self[prod].cls_name}")
+                    logger.info(f"Rerun producer {self[prod].cls_name}")
                     events = self[prod](events, **kwargs)
 
         # Create normalized weight columns if possible

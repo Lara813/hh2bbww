@@ -8,6 +8,7 @@ import functools
 import law
 import order as od
 
+from hbw.util import round_sig
 from columnflow.util import maybe_import, DotDict
 
 
@@ -16,6 +17,8 @@ plt = maybe_import("matplotlib.pyplot")
 mplhep = maybe_import("mplhep")
 hist = maybe_import("hist")
 tf = maybe_import("tensorflow")
+
+logger = law.logger.get_logger(__name__)
 
 
 def plot_history(
@@ -45,11 +48,36 @@ def plot_history(
     ax.legend(["train", "validation"], loc="best")
     mplhep.cms.label(ax=ax, llabel="Simulation Work in progress", data=False)
 
+    plt.tight_layout()
     output.child(f"{output_name}.pdf", type="f").dump(fig, formatter="mpl")
 
 
 plot_loss = functools.partial(plot_history, metric="loss", ylabel="Loss")
 plot_accuracy = functools.partial(plot_history, metric="categorical_accuracy", ylabel="Accuracy")
+
+
+def gather_confusion_stats(
+        confusion: np.array,
+        process_insts: tuple[od.Process],
+        input_type: str,
+        stats: dict,
+) -> None:
+    from math import sqrt
+    for i in range(len(confusion)):
+        # labels must be in the same order as the confusion matrix
+        proc_name = process_insts[i].name
+
+        # diagonal events are True Positives (TP) or Signal (S)
+        TP = S = confusion[i, i]
+
+        # offdiagonal entries are either False Positives (FP or B) or False Negatives (FN) based on axis
+        FP = B = np.sum(confusion[:, i]) - S
+        FN = np.sum(confusion[i]) - S
+
+        stats[f"precision_{input_type}_{proc_name}"] = round_sig(TP / (TP + FP), 4, float)
+        stats[f"recall_{input_type}_{proc_name}"] = round_sig(TP / (TP + FN), 4, float)
+        stats[f"S_over_B_{input_type}_{proc_name}"] = round_sig(S / B, 4, float)
+        stats[f"S_over_sqrtB_{input_type}_{proc_name}"] = round_sig(S / sqrt(B), 4, float)
 
 
 def plot_confusion(
@@ -58,6 +86,8 @@ def plot_confusion(
         output: law.FileSystemDirectoryTarget,
         input_type: str,
         process_insts: tuple[od.Process],
+        stats: dict | None = None,
+        normalize: str = "columns",
 ) -> None:
     """
     Simple function to create and store a confusion matrix plot
@@ -72,9 +102,24 @@ def plot_confusion(
         y_true=inputs.label,
         y_pred=np.argmax(inputs.prediction, axis=1),
         sample_weight=inputs.weights,
-        normalize="true",
     )
-    # legend
+    if isinstance(stats, dict):
+        gather_confusion_stats(confusion, process_insts, input_type, stats)
+
+    # normalize confusion matrix (axis=1: over columns (predicted), axis=0: over rows (truth))
+    if normalize == "columns":
+        # normalize over columns (predicted)
+        confusion = confusion / confusion.sum(axis=1, keepdims=True)
+    elif normalize == "rows":
+        # normalize over rows (truth)
+        confusion = confusion / confusion.sum(axis=0, keepdims=True)
+    elif normalize == "total":
+        # normalize over all entries
+        confusion = confusion / confusion.sum()
+    else:
+        logger.info(f"Confusion will not be normalized with normalize={normalize}")
+
+    # gather process labels
     labels = (
         [proc_inst.x("ml_label", proc_inst.label) for proc_inst in process_insts]
         if process_insts else None
@@ -87,6 +132,7 @@ def plot_confusion(
     ax.set_title(f"Confusion matrix for {input_type} set, rows normalized", fontsize=20, pad=+40)
     mplhep.cms.label(ax=ax, llabel="Simulation Work in progress", data=False, loc=0)
 
+    plt.tight_layout()
     output.child(f"Confusion_{input_type}.pdf", type="f").dump(fig, formatter="mpl")
 
 
@@ -96,6 +142,7 @@ def plot_roc_ovr(
         output: law.FileSystemDirectoryTarget,
         input_type: str,
         process_insts: tuple[od.Process],
+        stats: dict | None = None,
 ) -> None:
     """
     Simple function to create and store some ROC plots;
@@ -140,6 +187,11 @@ def plot_roc_ovr(
     mplhep.cms.label(ax=ax, llabel="Simulation\nWork in progress", data=False, loc=2)
 
     output.child(f"ROC_ovr_{input_type}.pdf", type="f").dump(fig, formatter="mpl")
+
+    if isinstance(stats, dict):
+        # append AUC scores to stats dict
+        for i, auc_score in enumerate(auc_scores):
+            stats[f"AUC_{input_type}_{process_insts[i].name}"] = round_sig(auc_score, 4, float)
 
 
 def plot_roc_ovo(
@@ -209,7 +261,8 @@ def plot_output_nodes(
         validation: DotDict,
         output: law.FileSystemDirectoryTarget,
         process_insts: tuple[od.Process],
-        normalize: bool = True,
+        shape_norm: bool = True,
+        y_log: bool = True,
 ) -> None:
     """
     Function that creates a plot for each ML output node,
@@ -235,7 +288,8 @@ def plot_output_nodes(
 
         for input_type, inputs in (("train", train), ("validation", validation)):
             for j in range(n_classes):
-                mask = (np.argmax(inputs.target, axis=1) == j)
+                mask = (inputs.label == j)
+                # mask = (np.argmax(inputs.target, axis=1) == j)
                 fill_kwargs = {
                     "type": input_type,
                     "process": j,
@@ -255,7 +309,7 @@ def plot_output_nodes(
         plt.hist([], histtype="step", label="Validation", linestyle="dotted", color="black")
 
         # get the correct normalization factors
-        if normalize:
+        if shape_norm:
             scale_train = np.array([
                 h[{"type": "train", "process": i}].sum().value for i in range(n_classes)
             ])[:, np.newaxis]
@@ -272,11 +326,20 @@ def plot_output_nodes(
         # legend
         ax.legend(loc="best")
 
-        ax.set(**{
+        # axis styling
+        ax_kwargs = {
             "ylabel": "Entries",
-            "ylim": (0.00001, ax.get_ylim()[1]),
             "xlim": (0, 1),
-        })
+            "yscale": "log" if y_log else "linear",
+        }
+        # set y_lim to appropriate ranges based on the yscale
+        y_max = ax.get_ylim()[1]
+        if y_log:
+            ax_kwargs["ylim"] = (y_max * 1e-4, y_max * 2)
+        else:
+            ax_kwargs["ylim"] = (0.00001, y_max)
+
+        ax.set(**ax_kwargs)
 
         # plot validation scores, scaled to train dataset
         (h[{"type": "validation"}] / scale_val).plot1d(**plot_kwargs, linestyle="dotted")
@@ -291,7 +354,7 @@ def get_input_weights(model, output, input_features: list | None = None):
     """
     if not input_features:
         input_features = tuple(
-            output.sibling("mlmodel", type="d").child("input_features.pkl", type="f").load(formatter="pickle"),
+            output.sibling("", type="d").child("input_features.pkl", type="f").load(formatter="pickle"),
         )
 
     # get the weights from the first dense layer

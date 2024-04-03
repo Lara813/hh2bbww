@@ -5,7 +5,7 @@ Selectors to set ak columns for cutflow features
 """
 
 from columnflow.util import maybe_import
-from columnflow.columnar_util import set_ak_column
+from columnflow.columnar_util import Route, set_ak_column, EMPTY_INT, EMPTY_FLOAT, optional_column as optional
 from columnflow.selection import SelectionResult
 from columnflow.production import Producer, producer
 
@@ -17,11 +17,12 @@ ak = maybe_import("awkward")
 
 @producer(
     # used and produced columns per object are defined in init function
-    uses=(prepare_objects),
+    uses={prepare_objects, "PV.npvs", optional("Pileup.nTrueInt"), optional("Pileup.nPU")},
     produces={
         "cutflow.n_electron", "cutflow.n_muon", "cutflow.n_lepton",
         "cutflow.n_veto_electron", "cutflow.n_veto_muon", "cutflow.n_veto_lepton",
         "cutflow.n_veto_tau",
+        "cutflow.npvs", "cutflow.npu_true", "cutflow.npu",
     },
     # skip the checking existence of used/produced columns for now because some columns are not there
     check_used_columns=False,
@@ -43,14 +44,28 @@ def cutflow_features(self: Producer, events: ak.Array, results: SelectionResult,
     events = set_ak_column(events, "cutflow.n_veto_lepton", ak.num(arr.VetoLepton, axis=1))
     events = set_ak_column(events, "cutflow.n_veto_tau", ak.num(arr.VetoTau, axis=1))
 
-    # save up to 4 loose jets
-    events = set_ak_column(events, "cutflow.LooseJet", arr.LooseJet[:, :3])
+    # Primary vertices
+    events = set_ak_column(events, "cutflow.npvs", events.PV.npvs)
+    if "Pileup" in events.fields:
+        events = set_ak_column(events, "cutflow.npu_true", events.Pileup.nTrueInt)
+        events = set_ak_column(events, "cutflow.npu", events.Pileup.nPU)
+    else:
+        events = set_ak_column(events, "cutflow.npu_true", EMPTY_INT)
+        events = set_ak_column(events, "cutflow.npu", EMPTY_INT)
 
-    # save up to 3 veto leptons
+    # save up to 4 loose jets and up to 4 selected jets
+    events = set_ak_column(events, "cutflow.LooseJet", arr.LooseJet[:, :4])
+    events = set_ak_column(events, "cutflow.Jet", arr.Jet[:, :4])
+    events = set_ak_column(events, "cutflow.JetPtBelow50", arr.Jet[arr.Jet.pt < 50][:, :4])
+
+    # save up to 2 veto leptons
     events = set_ak_column(events, "cutflow.VetoLepton", arr.VetoLepton[:, :2])
     events = set_ak_column(events, "cutflow.VetoElectron", arr.VetoElectron[:, :2])
     events = set_ak_column(events, "cutflow.VetoMuon", arr.VetoMuon[:, :2])
 
+    # zero-padding of potential nan value
+    for col in ("cutflow.Jet.qgl", "cutflow.LooseJet.qgl"):
+        events = set_ak_column(events, col, ak.fill_none(ak.nan_to_none(Route(col).apply(events)), EMPTY_FLOAT))
     return events
 
 
@@ -66,7 +81,7 @@ def cutflow_features_init(self: Producer) -> None:
     }
     self.electron_columns = {"pfRelIso03_all", "mvaFall17V2Iso", "mvaFall17V2noIso"}
     self.muon_columns = {"pfRelIso04_all", "mvaLowPt"}
-    self.jet_columns = {"pt"}
+    self.jet_columns = {"pt", "puId", "puIdDisc", "qgl", "bRegRes", "bRegCorr"}
 
     self.uses |= (
         set(
@@ -77,6 +92,9 @@ def cutflow_features_init(self: Producer) -> None:
         ) |
         set(
             f"Muon.{var}" for var in self.muon_columns
+        ) |
+        set(
+            f"Jet.{var}" for var in self.jet_columns
         )
     )
 
@@ -92,5 +110,11 @@ def cutflow_features_init(self: Producer) -> None:
         ) |
         set(
             f"cutflow.LooseJet.{var}" for var in self.jet_columns
+        ) |
+        set(
+            f"cutflow.JetPtBelow50.{var}" for var in self.jet_columns
+        ) |
+        set(
+            f"cutflow.Jet.{var}" for var in self.jet_columns
         )
     )
