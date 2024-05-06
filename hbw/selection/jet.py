@@ -66,8 +66,8 @@ def jet_selection(
         (abs(events.Jet.eta) <= 2.4) &
         (events.Jet.jetId >= 2) &  # 1: loose, 2: tight, 4: isolated, 6: tight+isolated
         # ak.all(events.Jet.metric_table(lepton_results.x.lepton) > 0.4, axis=2)
-        ak.all(events.Jet.metric_table(electron) > 0.4, axis=2) &
-        ak.all(events.Jet.metric_table(muon) > 0.4, axis=2)
+        ak.all(events.Jet.metric_table(electron) > 0.3, axis=2) &
+        ak.all(events.Jet.metric_table(muon) > 0.3, axis=2)
     )
 
     # apply loose Jet puId to jets with pt below 50 GeV (not in Run3 samples so skip this for now)
@@ -132,7 +132,7 @@ def jet_selection(
 @jet_selection.init
 def jet_selection_init(self: Selector) -> None:
     # configuration of defaults
-    self.jet_pt = self.config_inst.x("jet_pt", 25)
+    self.jet_pt = self.config_inst.x("jet_pt", 20)
 
     # Add shift dependencies
     self.shifts |= {

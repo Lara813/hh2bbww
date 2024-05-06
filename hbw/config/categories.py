@@ -204,75 +204,12 @@ def add_categories_selection(config: od.Config) -> None:
     # adds categories based on the existence of gen particles
     # add_gen_categories(config)
 
-<<<<<<< HEAD
     # adds categories for ABCD background estimation
     add_abcd_categories(config)
 
     # adds categories based on number of leptons
     add_lepton_categories(config)
 
-=======
-    config.x.lepton_channels = {
-        "sl": ("1e", "1mu"),
-        "dl": ("2e", "2mu", "emu"),
-    }[config.x.lepton_tag]
-
-    config.add_category(
-        name="incl",
-        id=1,
-        selection="catid_selection_incl",
-        label="Inclusive",
-    )
-
-    cat_1e = config.add_category(  # noqa
-        name="1e",
-        id=1000,
-        selection="catid_selection_1e",
-        label="1 Electron",
-    )
-
-    cat_1mu = config.add_category(  # noqa
-        name="1mu",
-        id=2000,
-        selection="catid_selection_1mu",
-        label="1 Muon",
-    )
-    # dl categories
-    cat_2e = config.add_category(  # noqa
-        name="2e",
-        id=3000,
-        selection="catid_selection_2e",
-        label="2 Electron",
-    )
-
-    cat_2mu = config.add_category(  # noqa
-        name="2mu",
-        id=4000,
-        selection="catid_selection_2mu",
-        label="2 Muon",
-    )
-
-    cat_emu = config.add_category(  # noqa
-        name="emu",
-        id=5000,
-        selection="catid_selection_emu",
-        label="1 Electron 1 Muon",
-    )
-
-    category_blocks = OrderedDict({
-        "lep": [config.get_category(lep_ch) for lep_ch in config.x.lepton_channels],
-    })
-
-    """
-    n_cats = create_category_combinations(
-        config,
-        category_blocks,
-        name_fn=name_fn,
-        kwargs_fn=kwargs_fn,
-        skip_existing=False,  # there should be no existing sub-categories
-    )
-    """
->>>>>>> 323ff31 (specific dictionaires for studies on ml and inference for DL implementation)
 
 
 @call_once_on_config()

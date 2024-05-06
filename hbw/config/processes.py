@@ -124,11 +124,11 @@ def configure_hbw_processes(config: od.Config):
             xsecs={
                 13: sum([proc.get_xsec(13) for proc in signal_processes]),
             },
-            label="signal (kl=0,1,2p45)",
+            label="signal (kl=0,1,2p45,5)",
         )
         for proc in signal_processes:
             try:
-                sig.add_process(proc)
+                ggHH_sig_all.add_process(proc)
             except Exception:
                 # this also adds 'sig' as parent to 'proc', but sometimes this is happening
                 # multiple times, since we create multiple configs

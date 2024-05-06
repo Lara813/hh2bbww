@@ -164,7 +164,6 @@ def set_config_defaults_and_groups(config_inst):
     # category groups for conveniently looping over certain categories
     # (used during plotting and for rebinning)
     config_inst.x.category_groups = {
-<<<<<<< HEAD
         "sl_much": ["sr__1mu", "sr__1mu__resolved", "sr__1mu__boosted"],
         "sl_ech": ["sr__1e", "sr__1e__resolved", "sr__1e__boosted"],
         "sl_much_resolved": ["sr__1mu__resolved", "sr__1mu__resolved__1b", "sr__1mu__resolved__2b"],
@@ -214,7 +213,6 @@ def set_config_defaults_and_groups(config_inst):
             "sr__2mu__ml_tt", "sr__2mu__ml_st", "sr__2mu__ml_dy_lep",
             "sr__emu__ml_tt", "sr__emu__ml_st", "sr__emu__ml_dy_lep",
         ),
-=======
         "much": ["1mu", "1mu__resolved", "1mu__boosted"],
         "ech": ["1e", "1e__resolved", "1e__boosted"],
         "default": ["incl", "1e", "1mu"],
@@ -227,11 +225,8 @@ def set_config_defaults_and_groups(config_inst):
         "vbfSR_resolved": ("1e__ml_resolved_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww", "1mu__ml_resolved_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),  # noqa
         "vbfSR_boosted": ("1e__ml_boosted_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww", "1mu__ml_boosted_qqHH_CV_1_C2V_1_kl_1_sl_hbbhww"),  # noqa
         "BR": ("1e__ml_tt", "1e__ml_st", "1e__ml_v_lep", "1mu__ml_tt", "1mu__ml_st", "1mu__ml_v_lep"),
-<<<<<<< HEAD
-        "SR_dl": ("2e__ml_ggHH_kl_5_kt_1_dl_hbbhww", "2mu__ml_ggHH_kl_5_kt_1_dl_hbbhww"),
-        "BR_dl": ("2e__ml_t_bkg", "2e__ml_v_lep", "2mu__ml_t_bkg", "2mu__ml_v_lep"),
->>>>>>> a4049a7 (remove inconsitencies between config category and inference category names)
-=======
+        # "SR_dl": ("2e__ml_ggHH_kl_5_kt_1_dl_hbbhww", "2mu__ml_ggHH_kl_5_kt_1_dl_hbbhww"),
+        # "BR_dl": ("2e__ml_t_bkg", "2e__ml_v_lep", "2mu__ml_t_bkg", "2mu__ml_v_lep"),
         "SR_dl": (
             "2e__1b__ml_ggHH_sig",
             "2mu__1b__ml_ggHH_sig",
@@ -266,7 +261,6 @@ def set_config_defaults_and_groups(config_inst):
             "emu__2b__ml_dy_lep",
             "2mu__2b__ml_dy_lep",
         ),
->>>>>>> 058eee1 (kl_test_study_equal_weighting in ml/base.py implemented)
     }
 
     # variable groups for conveniently looping over certain variables

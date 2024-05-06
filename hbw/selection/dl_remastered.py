@@ -164,7 +164,7 @@ def dl_lepton_selection(
 @dl_lepton_selection.init
 def dl_lepton_selection_init(self: Selector) -> None:
     # configuration of defaults
-    self.mu_pt = self.config_inst.x("mu_pt", 25)
+    self.mu_pt = self.config_inst.x("mu_pt", 20)
     self.ele_pt = self.config_inst.x("ele_pt", 25)
     self.mu2_pt = self.config_inst.x("mu2_pt", 15)
     self.ele2_pt = self.config_inst.x("ele2_pt", 15)

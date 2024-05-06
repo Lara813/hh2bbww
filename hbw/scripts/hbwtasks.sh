@@ -7,7 +7,7 @@ alias hbw_synchronization="cf_sandbox venv_columnar_dev 'python $HBW_BASE/hbw/sc
 # defaults, setup by the law config
 # NOTE: calibration version should correspond to what is setup in the config as our default calibration config
 version=$(law config analysis.default_version)
-common_version=$(law config analysis.default_common_version)
+common_version=common1 # $(law config analysis.default_common_version)
 config=$(law config analysis.default_config)
 echo "hbwtasks functions will be run with version '$version' and config '$config'"
 
@@ -93,7 +93,6 @@ hbw_merge_reduction(){
 	$@
 }
 
-<<<<<<< HEAD
 hbw_reduction_status(){
 	# call wrapper tasks with print-status flag to check output status from CalibrateEvents up to MergeReducedEvents
 	law run cf.MergeReducedEventsWrapper --version $version --datasets $datasets --print-status "0" $@
@@ -103,9 +102,7 @@ hbw_reduction_status(){
 	law run cf.SelectEventsWrapper --version $version --datasets $datasets --print-status "0" $@
 	law run cf.CalibrateEventsWrapper --version $version --datasets $datasets --print-status "0" $@
 }
-=======
 ml_model="dense_default_dl"
->>>>>>> dfea23d (implementing dl into newest dev version (inference tool, ml tool and production features))
 
 hbw_ml_training(){
     law run cf.MLTraining --version $version --workers 20 \
@@ -132,11 +129,8 @@ hbw_ml_training(){
 	$@
 }
 
-<<<<<<< HEAD
-=======
 inference_model="rates_only"
 producer="dl_features"
->>>>>>> dfea23d (implementing dl into newest dev version (inference tool, ml tool and production features))
 
 hbw_datacards_noML(){
     law run cf.CreateDatacards --version $version --workers 20 \

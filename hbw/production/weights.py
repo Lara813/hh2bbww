@@ -156,6 +156,7 @@ normalized_pu_weights = normalized_weight_factory(
         top_pt_weight,
         vjets_weight,
         normalized_pu_weights,
+        btag_weights,
         event_weight,
     },
     mc_only=True,

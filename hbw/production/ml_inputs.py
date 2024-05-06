@@ -50,7 +50,7 @@ def check_column_bookkeeping(self: Producer, events: ak.Array) -> None:
         prepare_objects,
         "HbbJet.msoftdrop",
         "Jet.btagDeepFlavB", "Bjet.btagDeepFlavB", "Lightjet.btagDeepFlavB",
-        "Jet.btagPNetB", "Bjet.btagPNetB", "Lightjet.btagPNetB",
+        # "Jet.btagPNetB", "Bjet.btagPNetB", "Lightjet.btagPNetB",
     } | four_vec(
         {"Electron", "Muon", "MET", "Jet", "Bjet", "Lightjet", "HbbJet", "VBFJet"},
     ),
@@ -74,7 +74,7 @@ def common_ml_inputs(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
         events = set_ak_column_f32(events, f"mli_fj_{var}", events.HbbJet[:, 0][var])
 
     # low-level features
-    for var in ["pt", "eta", "btagDeepFlavB", "btagPNetB"]:
+    for var in ["pt", "eta", "btagDeepFlavB"]: # , "btagPNetB"]:
         events = set_ak_column_f32(events, f"mli_b1_{var}", events.Bjet[:, 0][var])
         events = set_ak_column_f32(events, f"mli_b2_{var}", events.Bjet[:, 1][var])
         # even in DL, ~10% of events contain 4 jets, so it might be worth keeping this
@@ -111,9 +111,9 @@ def common_ml_inputs(self: Producer, events: ak.Array, **kwargs) -> ak.Array:
     events = set_ak_column_f32(
         events, "mli_n_particlenet", ak.num(events.Jet[events.Jet.btagDeepFlavB > wp_med_particlenet], axis=1),
     )
-    events = set_ak_column_f32(events, "mli_particlenetsum", ak.sum(events.Jet.btagPNetB, axis=1))
-    events = set_ak_column_f32(events, "mli_b_particlenetsum", ak.sum(events.Bjet.btagPNetB, axis=1))
-    events = set_ak_column_f32(events, "mli_l_particlenetsum", ak.sum(events.Lightjet.btagPNetB, axis=1))
+    # events = set_ak_column_f32(events, "mli_particlenetsum", ak.sum(events.Jet.btagPNetB, axis=1))
+    # events = set_ak_column_f32(events, "mli_b_particlenetsum", ak.sum(events.Bjet.btagPNetB, axis=1))
+    # events = set_ak_column_f32(events, "mli_l_particlenetsum", ak.sum(events.Lightjet.btagPNetB, axis=1))
 
     # all possible jet pairs
     jet_pairs = ak.combinations(events.Jet, 2)
@@ -151,7 +151,7 @@ def common_ml_inputs_init(self: Producer) -> None:
         # event features
         "mli_ht", "mli_lt", "mli_n_jet",
         "mli_n_deepjet", "mli_deepjetsum", "mli_b_deepjetsum", "mli_l_deepjetsum",
-        "mli_n_particlenet", "mli_particlenetsum", "mli_b_particlenetsum", "mli_l_particlenetsum",
+        "mli_n_particlenet", # "mli_particlenetsum", "mli_b_particlenetsum", "mli_l_particlenetsum",
         # bb system
         "mli_mbb", "mli_bb_pt", "mli_dr_bb", "mli_dphi_bb",
         # minimum angles
@@ -163,7 +163,7 @@ def common_ml_inputs_init(self: Producer) -> None:
     } | set(
         f"mli_{obj}_{var}"
         for obj in ["b1", "b2", "j1", "j2"]
-        for var in ["btagDeepFlavB", "btagPNetB", "pt", "eta"]
+        for var in ["btagDeepFlavB", "pt", "eta"] # btagPNetB
     ) | set(
         f"mli_{obj}_{var}"
         for obj in ["fj"]

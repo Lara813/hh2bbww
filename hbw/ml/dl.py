@@ -205,7 +205,7 @@ class DenseClassifierDL(ModelFitMixin, DenseModelMixin, MLClassifierBase):
 
     def training_selector(self, config_inst: od.Config, requested_selector: str) -> str:
         # fix MLTraining Phase Space
-        return "sl" if self.config_inst.has_tag("is_sl") else "dl"
+        return "sl" if self.config_inst.has_tag("is_sl") else "dl1"
 
     def training_producers(self, config_inst: od.Config, requested_producers: Sequence[str]) -> list[str]:
         # fix MLTraining Phase Space
